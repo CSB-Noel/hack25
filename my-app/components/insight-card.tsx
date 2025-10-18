@@ -37,6 +37,10 @@ interface InsightCardProps {
   onBlackhole: (id: string) => void
   onDragStart: () => void
   onDragEnd: () => void
+  isPressHold: boolean
+  holdProgress: number
+  cardDragPosition: {x: number, y: number} | null
+  isDeleting: boolean
 }
 
 export function InsightCard({
@@ -47,13 +51,13 @@ export function InsightCard({
   onBlackhole,
   onDragStart,
   onDragEnd,
+  isPressHold,
+  holdProgress,
+  cardDragPosition,
+  isDeleting,
 }: InsightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [dragY, setDragY] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const [isPressHold, setIsPressHold] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
-  const pressTimerRef = useRef<NodeJS.Timeout>()
 
   const getBadgeVariant = (badge: string) => {
     switch (badge) {
@@ -87,65 +91,28 @@ export function InsightCard({
     }
   }
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    setDragY(touch.clientY)
-
-    // Start press-and-hold timer
-    pressTimerRef.current = setTimeout(() => {
-      setIsPressHold(true)
-      onDragStart()
-      // Haptic feedback would go here
-    }, 500)
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current)
-    }
-
-    const touch = e.touches[0]
-    const deltaY = touch.clientY - dragY
-
-    if (isPressHold && deltaY > 50) {
-      setIsDragging(true)
-    } else if (!isPressHold && Math.abs(deltaY) > 50) {
-      // Vertical swipe for pagination
-      if (deltaY < 0) {
-        onNext()
-      } else {
-        onPrevious()
-      }
-      setDragY(touch.clientY)
-    }
-  }
-
-  const handleTouchEnd = () => {
-    if (pressTimerRef.current) {
-      clearTimeout(pressTimerRef.current)
-    }
-
-    if (isDragging && isPressHold) {
+  const handleBlackholeAction = () => {
+    if (isPressHold) {
       onBlackhole(insight.id)
     }
-
-    setIsDragging(false)
-    setIsPressHold(false)
-    onDragEnd()
   }
 
   return (
     <div className="h-full flex items-center justify-center p-4">
       <div
         ref={cardRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         className={cn(
-          "w-full max-w-md bg-card rounded-3xl border border-border shadow-2xl overflow-hidden transition-all",
-          isDragging && "opacity-50 scale-95",
+          "w-full max-w-md bg-card rounded-3xl border border-border shadow-2xl overflow-hidden transition-all select-none",
           isPressHold && "ring-2 ring-destructive",
         )}
+        style={{ 
+          userSelect: 'none', 
+          touchAction: 'none',
+          transform: `scale(${1 - holdProgress * 0.5})`,
+          opacity: 1 - holdProgress * 0.7,
+          transition: isPressHold ? 'none' : 'all 300ms ease-out',
+          pointerEvents: isDeleting ? 'none' : 'auto'
+        }}
       >
         {/* AI Header with badges and bullets */}
         <div className="bg-muted/30 p-4 border-b border-border">
@@ -244,12 +211,19 @@ export function InsightCard({
                 <Clock className="w-4 h-4 mr-2" />
                 Snooze
               </Button>
-              <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                Details
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1 bg-transparent"
+                onClick={handleBlackholeAction}
+              >
+                Blackhole
               </Button>
             </div>
           </div>
-          <p className="text-xs text-center text-muted-foreground mt-3">Press and hold to send to blackhole</p>
+          <p className="text-xs text-center text-muted-foreground mt-3">
+            {isPressHold ? "Release to send to blackhole" : "Press and hold anywhere to send to blackhole"}
+          </p>
         </div>
       </div>
     </div>
