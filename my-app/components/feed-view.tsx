@@ -142,27 +142,27 @@ export function FeedView() {
   }, [isPointerDown])
 
   const handleNext = () => {
-    if (currentIndex < visibleCards.length - 1) {
-      setCurrentIndex(currentIndex + 1)
-    }
+    setCurrentIndex((currentIndex + 1) % visibleCards.length)
   }
 
   const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1)
-    }
+    setCurrentIndex((currentIndex - 1) % visibleCards.length)
   }
 
   const handleBlackhole = (id: string) => {
     console.log("[v0] Blackhole action for insight:", id)
     
     // Remove card from visible cards
-    setVisibleCards(prev => prev.filter(card => card.id !== id))
-    
-    // Adjust current index if needed
-    if (currentIndex >= visibleCards.length - 1) {
-      setCurrentIndex(Math.max(0, currentIndex - 1))
-    }
+    setVisibleCards(prev => {
+      const newCards = prev.filter(card => card.id !== id)
+      
+      // Adjust current index if needed using the new length
+      if (currentIndex >= newCards.length) {
+        setCurrentIndex(Math.max(0, newCards.length - 1))
+      }
+      
+      return newCards
+    })
   }
 
   const startHoldAnimation = () => {
@@ -366,7 +366,7 @@ export function FeedView() {
       setDragOffset(0)
       setIsTransitioning(true)
       
-      if (deltaY < 0 && currentIndex < sampleInsights.length - 1) {
+      if (deltaY < 0 && currentIndex < visibleCards.length - 1) {
         // Swipe up - next card
         setCurrentIndex(currentIndex + 1)
       } else if (deltaY > 0 && currentIndex > 0) {
