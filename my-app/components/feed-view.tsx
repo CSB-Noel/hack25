@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { InsightCard } from "@/components/insight-card"
 import { BlackholeZone } from "@/components/blackhole-zone"
 
@@ -109,6 +109,29 @@ const sampleInsights = [
 export function FeedView() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [touchStartY, setTouchStartY] = useState(0)
+  const [touchStartTime, setTouchStartTime] = useState(0)
+  const [isPressHold, setIsPressHold] = useState(false)
+  const [isPointerDown, setIsPointerDown] = useState(false)
+  const pressTimerRef = useRef<NodeJS.Timeout>()
+
+  // Handle window blur to stop scrolling when user leaves window
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      if (isPointerDown) {
+        setIsPointerDown(false)
+        setDragOffset(0)
+        if (pressTimerRef.current) {
+          clearTimeout(pressTimerRef.current)
+        }
+      }
+    }
+
+    window.addEventListener('blur', handleWindowBlur)
+    return () => window.removeEventListener('blur', handleWindowBlur)
+  }, [isPointerDown])
 
   const handleNext = () => {
     if (currentIndex < sampleInsights.length - 1) {
@@ -130,12 +153,133 @@ export function FeedView() {
     }
   }
 
+  const handlePointerStart = (e: React.PointerEvent) => {
+    if (isTransitioning) return
+    
+    e.preventDefault()
+    setIsPointerDown(true)
+    setTouchStartY(e.clientY)
+    setTouchStartTime(Date.now())
+    setDragOffset(0)
+    setIsPressHold(false)
+
+    // Start press-and-hold timer
+    pressTimerRef.current = setTimeout(() => {
+      setIsPressHold(true)
+      setIsDragging(true)
+    }, 400)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isTransitioning || !isPointerDown) return
+
+    e.preventDefault()
+    const deltaY = e.clientY - touchStartY
+    const deltaTime = Date.now() - touchStartTime
+
+    // Clear press-and-hold timer if there's movement
+    if (pressTimerRef.current && Math.abs(deltaY) > 10) {
+      clearTimeout(pressTimerRef.current)
+      setIsPressHold(false)
+    }
+
+    // If in press-hold mode, don't handle swipe navigation
+    if (isPressHold) return
+
+    // Calculate swipe threshold (15% of viewport height - lower threshold)
+    const swipeThreshold = window.innerHeight * 0.15
+    
+    // Check for quick swipe (within 300ms) or slow swipe (15% threshold)
+    const isQuickSwipe = deltaTime < 300 && Math.abs(deltaY) > 30
+    const isSlowSwipe = Math.abs(deltaY) > swipeThreshold
+
+    // Always update drag offset for live feedback, but limit it to prevent overshooting
+    if (isQuickSwipe || isSlowSwipe) {
+      // Limit drag offset to prevent excessive movement
+      const maxOffset = window.innerHeight * 0.3
+      setDragOffset(Math.max(-maxOffset, Math.min(maxOffset, deltaY)))
+    } else {
+      // For smaller movements, still show some feedback
+      setDragOffset(deltaY * 0.5)
+    }
+  }
+
+  const handlePointerEnd = () => {
+    if (isTransitioning) return
+
+    // Clear press-and-hold timer
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current)
+    }
+
+    setIsPointerDown(false)
+    const deltaY = dragOffset
+    const deltaTime = Date.now() - touchStartTime
+    const swipeThreshold = window.innerHeight * 0.15
+
+    // If in press-hold mode, handle blackhole
+    if (isPressHold) {
+      setIsDragging(false)
+      setIsPressHold(false)
+      setDragOffset(0)
+      return
+    }
+
+    // Check for swipe navigation
+    const isQuickSwipe = deltaTime < 300 && Math.abs(deltaY) > 30
+    const isSlowSwipe = Math.abs(deltaY) > swipeThreshold
+
+    if (isQuickSwipe || isSlowSwipe) {
+      // Clear drag offset immediately to prevent overshooting
+      setDragOffset(0)
+      setIsTransitioning(true)
+      
+      if (deltaY < 0 && currentIndex < sampleInsights.length - 1) {
+        // Swipe up - next card
+        setCurrentIndex(currentIndex + 1)
+      } else if (deltaY > 0 && currentIndex > 0) {
+        // Swipe down - previous card
+        setCurrentIndex(currentIndex - 1)
+      }
+      
+      // Reset transition state after animation
+      setTimeout(() => {
+        setIsTransitioning(false)
+      }, 400)
+    } else {
+      // Bounce back if swipe wasn't sufficient
+      setDragOffset(0)
+    }
+  }
+
+  // Handle window leave to stop scrolling
+  const handlePointerLeave = () => {
+    if (isPointerDown) {
+      setIsPointerDown(false)
+      setDragOffset(0)
+      if (pressTimerRef.current) {
+        clearTimeout(pressTimerRef.current)
+      }
+    }
+  }
+
   return (
-    <div className="relative h-[calc(100vh-8rem)]">
+    <div 
+      className="relative h-[calc(100vh-8rem)] select-none"
+      onPointerDown={handlePointerStart}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onPointerLeave={handlePointerLeave}
+      style={{ touchAction: 'none', userSelect: 'none' }}
+    >
       <div className="h-full overflow-hidden">
         <div
-          className="h-full transition-transform duration-300 ease-out"
-          style={{ transform: `translateY(-${currentIndex * 100}%)` }}
+          className="h-full"
+          style={{ 
+            transform: `translateY(calc(-${currentIndex * 100}% + ${isTransitioning ? 0 : dragOffset}px))`,
+            transition: isTransitioning ? 'transform 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none'
+          }}
         >
           {sampleInsights.map((insight, index) => (
             <div key={insight.id} className="h-full snap-start">
@@ -147,26 +291,34 @@ export function FeedView() {
                 onBlackhole={handleBlackhole}
                 onDragStart={() => setIsDragging(true)}
                 onDragEnd={() => setIsDragging(false)}
+                isPressHold={isPressHold}
               />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Pagination dots */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+      {/* Pagination dots - vertical on left side */}
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
         {sampleInsights.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrentIndex(index)}
             className={`w-2 h-2 rounded-full transition-all ${
-              index === currentIndex ? "bg-primary w-6" : "bg-muted-foreground/30"
+              index === currentIndex ? "bg-primary h-6" : "bg-muted-foreground/30"
             }`}
           />
         ))}
       </div>
 
-      <BlackholeZone isActive={isDragging} />
+      <BlackholeZone 
+        isActive={isDragging} 
+        onDrop={() => {
+          if (isPressHold) {
+            handleBlackhole(sampleInsights[currentIndex].id)
+          }
+        }} 
+      />
     </div>
   )
 }
