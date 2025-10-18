@@ -211,14 +211,6 @@ export function InsightCard({
                 <Clock className="w-4 h-4 mr-2" />
                 Snooze
               </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex-1 bg-transparent"
-                onClick={handleBlackholeAction}
-              >
-                Blackhole
-              </Button>
             </div>
           </div>
           <p className="text-xs text-center text-muted-foreground mt-3">
