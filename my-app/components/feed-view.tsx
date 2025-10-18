@@ -1,12 +1,9 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { InsightCard } from "@/components/insight-card"
 import { BlackholeZone } from "@/components/blackhole-zone"
-import { GmailMessageCard } from "@/components/gmail-message-card"
-import { useGmailMessages } from "@/lib/hooks/use-gmail"
-import { Mail, Sparkles } from "lucide-react"
-import { Button } from "@/components/ui/button"
+
 
 // Sample financial insights data
 const sampleInsights = [
@@ -113,6 +110,11 @@ const sampleInsights = [
 export function FeedView() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [isNearBlackhole, setIsNearBlackhole] = useState(false)
+  const [isPressHold, setIsPressHold] = useState(false)
+  const [holdProgress, setHoldProgress] = useState(0)
+  const [cardDragPosition, setCardDragPosition] = useState<{x: number, y: number} | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleNext = () => {
     if (currentIndex < sampleInsights.length - 1) {
@@ -121,7 +123,9 @@ export function FeedView() {
   }
 
   const handlePrevious = () => {
-    setCurrentIndex((currentIndex - 1) % visibleCards.length)
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1)
+    }
   }
 
   const handleBlackhole = (id: string) => {
@@ -131,8 +135,6 @@ export function FeedView() {
       setCurrentIndex(currentIndex + 1)
     }
   }
-
-  const currentItems = activeTab === 'insights' ? sampleInsights : gmailMessages
 
   return (
     <div className="relative h-[calc(100vh-8rem)]">
@@ -151,6 +153,10 @@ export function FeedView() {
                 onBlackhole={handleBlackhole}
                 onDragStart={() => setIsDragging(true)}
                 onDragEnd={() => setIsDragging(false)}
+                isPressHold={isPressHold}
+                holdProgress={holdProgress}
+                cardDragPosition={cardDragPosition}
+                isDeleting={isDeleting}
               />
             </div>
           ))}
@@ -173,11 +179,7 @@ export function FeedView() {
       <BlackholeZone 
         isActive={isDragging} 
         isNearBlackhole={isNearBlackhole}
-        onDrop={() => {
-          if (isPressHold) {
-            handleBlackhole(visibleCards[currentIndex].id)
-          }
-        }} 
+        onDrop={() => handleBlackhole(sampleInsights[currentIndex].id)}
       />
     </div>
   )
