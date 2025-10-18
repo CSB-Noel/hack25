@@ -38,6 +38,9 @@ interface InsightCardProps {
   onDragStart: () => void
   onDragEnd: () => void
   isPressHold: boolean
+  holdProgress: number
+  cardDragPosition: {x: number, y: number} | null
+  isDeleting: boolean
 }
 
 export function InsightCard({
@@ -49,6 +52,9 @@ export function InsightCard({
   onDragStart,
   onDragEnd,
   isPressHold,
+  holdProgress,
+  cardDragPosition,
+  isDeleting,
 }: InsightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -97,9 +103,16 @@ export function InsightCard({
         ref={cardRef}
         className={cn(
           "w-full max-w-md bg-card rounded-3xl border border-border shadow-2xl overflow-hidden transition-all select-none",
-          isPressHold && "opacity-50 scale-95 ring-2 ring-destructive",
+          isPressHold && "ring-2 ring-destructive",
         )}
-        style={{ userSelect: 'none', touchAction: 'none' }}
+        style={{ 
+          userSelect: 'none', 
+          touchAction: 'none',
+          transform: `scale(${1 - holdProgress * 0.5})`,
+          opacity: 1 - holdProgress * 0.7,
+          transition: isPressHold ? 'none' : 'all 300ms ease-out',
+          pointerEvents: isDeleting ? 'none' : 'auto'
+        }}
       >
         {/* AI Header with badges and bullets */}
         <div className="bg-muted/30 p-4 border-b border-border">

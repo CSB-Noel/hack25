@@ -132,7 +132,7 @@ export function InboxFeed({ onCompose }: InboxFeedProps) {
         ))}
       </div>
 
-      <BlackholeZone isActive={isDragging} onDrop={handleBlackholeDrop} />
+      <BlackholeZone isActive={isDragging} isNearBlackhole={false} onDrop={handleBlackholeDrop} />
     </div>
   )
 }

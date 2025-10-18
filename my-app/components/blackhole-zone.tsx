@@ -6,10 +6,11 @@ import { cn } from "@/lib/utils"
 
 interface BlackholeZoneProps {
   isActive: boolean
+  isNearBlackhole: boolean
   onDrop: () => void
 }
 
-export function BlackholeZone({ isActive, onDrop }: BlackholeZoneProps) {
+export function BlackholeZone({ isActive, isNearBlackhole, onDrop }: BlackholeZoneProps) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
@@ -24,8 +25,9 @@ export function BlackholeZone({ isActive, onDrop }: BlackholeZoneProps) {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={cn(
-        "fixed bottom-24 left-1/2 -translate-x-1/2 z-40 transition-all duration-300",
+        "fixed bottom-32 left-1/2 -translate-x-1/2 z-40 transition-all duration-300",
         isActive ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none",
+        isNearBlackhole && "scale-125"
       )}
     >
       <div className="relative">
@@ -34,6 +36,7 @@ export function BlackholeZone({ isActive, onDrop }: BlackholeZoneProps) {
           className={cn(
             "absolute inset-0 rounded-full blur-2xl transition-all",
             isActive && "animate-pulse bg-destructive/30",
+            isNearBlackhole && "animate-ping bg-destructive/50"
           )}
           style={{ transform: "scale(1.5)" }}
         />
@@ -43,6 +46,7 @@ export function BlackholeZone({ isActive, onDrop }: BlackholeZoneProps) {
           className={cn(
             "relative w-32 h-32 rounded-full bg-gradient-to-br from-destructive/80 to-destructive flex items-center justify-center shadow-2xl border-4 border-destructive/50 transition-all",
             isActive && "scale-110",
+            isNearBlackhole && "scale-125 animate-pulse"
           )}
         >
           {/* Inner void */}
@@ -64,7 +68,12 @@ export function BlackholeZone({ isActive, onDrop }: BlackholeZoneProps) {
 
         {/* Label */}
         <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-          <p className="text-sm font-semibold text-destructive">Drop to delete</p>
+          <p className={cn(
+            "text-sm font-semibold text-destructive transition-all",
+            isNearBlackhole && "animate-pulse text-destructive/80"
+          )}>
+            {isNearBlackhole ? "Release to delete" : "Hold to delete"}
+          </p>
         </div>
       </div>
     </div>
