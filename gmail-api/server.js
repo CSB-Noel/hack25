@@ -9,7 +9,6 @@ server.use(express.json());
 let messagesWithDate = [];
 
 server.get('/emails', async (req, res) => {
-  console.log(messagesWithDate);
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -48,6 +47,7 @@ server.get('/emails', async (req, res) => {
     // Clean markdown code fences if they exist
     const data = await response.json();
     const rawContent = data.choices[0].message.content;
+    console.log("Raw content received:", rawContent);
     const cleaned = rawContent.replace(/```json|```/g, '').trim();
     insightsJson = JSON.parse(cleaned);
     res.json(insightsJson);
