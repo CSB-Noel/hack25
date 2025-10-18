@@ -75,7 +75,7 @@ function authorize(credentials) {
   const oAuth2Client = new google.auth.OAuth2(
     client_id,
     client_secret,
-    'http://localhost:3000/oauth2callback' // redirect URI
+    'http://localhost:8000/oauth2callback' // redirect URI
   );
 
   getNewToken(oAuth2Client);
@@ -102,7 +102,7 @@ function getNewToken(oAuth2Client) {
     listMessages(oAuth2Client);
   });
 
-  const server = app.listen(3000, () => console.log('Listening on port 3000'));
+  const server = app.listen(8000, () => console.log('Listening on port 8000'));
 }
 
 // Text only

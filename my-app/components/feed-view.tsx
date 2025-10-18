@@ -5,137 +5,112 @@ import { InsightCard } from "@/components/insight-card"
 import { BlackholeZone } from "@/components/blackhole-zone"
 
 
-const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer <OPENROUTER_API_KEY>",
-    "HTTP-Referer": "<YOUR_SITE_URL>", // Optional. Site URL for rankings on openrouter.ai.
-    "X-Title": "<YOUR_SITE_NAME>", // Optional. Site title for rankings on openrouter.ai.
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    "model": "google/gemini-2.5-flash",
-    "messages": [
-      {
-        "role": "user",
-        "content": [
-          {
-            "type": "text",
-            "text": "What is in this image?"
-          },
-          {
-            "type": "image_url",
-            "image_url": {
-              "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
-            }
-          }
-        ]
-      }
-    ]
-  })
-});
+
+const sampleInsights: any = [];
+
+
 
 // Sample financial insights data
-const sampleInsights = [
-  {
-    id: "1",
-    kind: "subscription" as const,
-    title: "Spotify price increased",
-    merchantOrBill: "Spotify",
-    amount: 10.99,
-    date: "2025-10-01T10:22:00Z",
-    account: "Capital One Savor",
-    category: "Entertainment",
-    delta30: 1.0,
-    delta90: 1.0,
-    aiHeader: {
-      bullets: [
-        "Price up $1.00 vs last month",
-        "Duplicate service: also paying Apple Music",
-        "Low usage in past 60 days",
-      ],
-      nextStep: "Keep Spotify, cancel Apple Music?",
-      badges: ["priority", "priceUp", "duplicateSub"],
-      confidence: 0.91,
-    },
-  },
-  {
-    id: "2",
-    kind: "bill" as const,
-    title: "Electric bill due soon",
-    merchantOrBill: "Pacific Gas & Electric",
-    amount: 142.5,
-    date: "2025-10-15T00:00:00Z",
-    account: "Chase Checking",
-    category: "Utilities",
-    delta30: 12.5,
-    delta90: -5.2,
-    aiHeader: {
-      bullets: ["Due in 3 days", "Up 9.6% from last month", "Balance sufficient to pay"],
-      nextStep: "Schedule payment now?",
-      badges: ["dueSoon"],
-      confidence: 0.95,
-    },
-  },
-  {
-    id: "3",
-    kind: "anomaly" as const,
-    title: "Unusual spending detected",
-    merchantOrBill: "Amazon",
-    amount: 287.43,
-    date: "2025-10-12T14:30:00Z",
-    account: "Capital One Savor",
-    category: "Shopping",
-    delta30: 150.0,
-    delta90: 200.0,
-    aiHeader: {
-      bullets: ["3x your typical Amazon spend", "Multiple charges in one day", "Consider setting a monthly cap"],
-      nextStep: "Review charges or set budget alert?",
-      badges: ["anomaly"],
-      confidence: 0.88,
-    },
-  },
-  {
-    id: "4",
-    kind: "goal" as const,
-    title: "Emergency fund progress",
-    merchantOrBill: "Savings Goal",
-    amount: 3250.0,
-    date: "2025-10-18T00:00:00Z",
-    account: "High-Yield Savings",
-    category: "Savings",
-    delta30: 500.0,
-    delta90: 1250.0,
-    aiHeader: {
-      bullets: ["65% to your $5,000 target", "On track to reach goal in 4 months", "Found $150 excess in checking"],
-      nextStep: "Sweep excess to savings?",
-      badges: [],
-      confidence: 0.92,
-    },
-  },
-  {
-    id: "5",
-    kind: "advice" as const,
-    title: "Subscription optimization",
-    merchantOrBill: "Multiple Services",
-    amount: 89.97,
-    date: "2025-10-18T00:00:00Z",
-    account: "Multiple Accounts",
-    category: "Subscriptions",
-    delta30: 0,
-    delta90: 0,
-    aiHeader: {
-      bullets: [
-        "Paying for 3 streaming services",
-        "Could save $30/mo with family plan",
-        "Netflix, Hulu, Disney+ detected",
-      ],
-      nextStep: "Switch to bundle plan?",
-      badges: ["priority"],
-      confidence: 0.87,
-    },
-  },
-]
+// const sampleInsights = [
+//   {
+//     id: "1",
+//     kind: "subscription" as const,
+//     title: "Spotify price increased",
+//     merchantOrBill: "Spotify",
+//     amount: 10.99,
+//     date: "2025-10-01T10:22:00Z",
+//     account: "Capital One Savor",
+//     category: "Entertainment",
+//     delta30: 1.0,
+//     delta90: 1.0,
+//     aiHeader: {
+//       bullets: [
+//         "Price up $1.00 vs last month",
+//         "Duplicate service: also paying Apple Music",
+//         "Low usage in past 60 days",
+//       ],
+//       nextStep: "Keep Spotify, cancel Apple Music?",
+//       badges: ["priority", "priceUp", "duplicateSub"],
+//       confidence: 0.91,
+//     },
+//   },
+//   {
+//     id: "2",
+//     kind: "bill" as const,
+//     title: "Electric bill due soon",
+//     merchantOrBill: "Pacific Gas & Electric",
+//     amount: 142.5,
+//     date: "2025-10-15T00:00:00Z",
+//     account: "Chase Checking",
+//     category: "Utilities",
+//     delta30: 12.5,
+//     delta90: -5.2,
+//     aiHeader: {
+//       bullets: ["Due in 3 days", "Up 9.6% from last month", "Balance sufficient to pay"],
+//       nextStep: "Schedule payment now?",
+//       badges: ["dueSoon"],
+//       confidence: 0.95,
+//     },
+//   },
+//   {
+//     id: "3",
+//     kind: "anomaly" as const,
+//     title: "Unusual spending detected",
+//     merchantOrBill: "Amazon",
+//     amount: 287.43,
+//     date: "2025-10-12T14:30:00Z",
+//     account: "Capital One Savor",
+//     category: "Shopping",
+//     delta30: 150.0,
+//     delta90: 200.0,
+//     aiHeader: {
+//       bullets: ["3x your typical Amazon spend", "Multiple charges in one day", "Consider setting a monthly cap"],
+//       nextStep: "Review charges or set budget alert?",
+//       badges: ["anomaly"],
+//       confidence: 0.88,
+//     },
+//   },
+//   {
+//     id: "4",
+//     kind: "goal" as const,
+//     title: "Emergency fund progress",
+//     merchantOrBill: "Savings Goal",
+//     amount: 3250.0,
+//     date: "2025-10-18T00:00:00Z",
+//     account: "High-Yield Savings",
+//     category: "Savings",
+//     delta30: 500.0,
+//     delta90: 1250.0,
+//     aiHeader: {
+//       bullets: ["65% to your $5,000 target", "On track to reach goal in 4 months", "Found $150 excess in checking"],
+//       nextStep: "Sweep excess to savings?",
+//       badges: [],
+//       confidence: 0.92,
+//     },
+//   },
+//   {
+//     id: "5",
+//     kind: "advice" as const,
+//     title: "Subscription optimization",
+//     merchantOrBill: "Multiple Services",
+//     amount: 89.97,
+//     date: "2025-10-18T00:00:00Z",
+//     account: "Multiple Accounts",
+//     category: "Subscriptions",
+//     delta30: 0,
+//     delta90: 0,
+//     aiHeader: {
+//       bullets: [
+//         "Paying for 3 streaming services",
+//         "Could save $30/mo with family plan",
+//         "Netflix, Hulu, Disney+ detected",
+//       ],
+//       nextStep: "Switch to bundle plan?",
+//       badges: ["priority"],
+//       confidence: 0.87,
+//     },
+//   },
+// ]
 
 export function FeedView() {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -171,6 +146,23 @@ export function FeedView() {
     window.addEventListener('blur', handleWindowBlur)
     return () => window.removeEventListener('blur', handleWindowBlur)
   }, [isPointerDown])
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/emails");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setVisibleCards(data);
+      } catch (error) {
+        console.error("Failed to fetch insights:", error);
+      }
+    };
+
+    fetchInsights();
+  }, []);
 
   const handleNext = () => {
     setCurrentIndex((currentIndex + 1) % visibleCards.length)
