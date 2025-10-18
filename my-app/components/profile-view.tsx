@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch"
 
 export function ProfileView() {
   return (
+    <>
     <div className="px-4 max-w-md mx-auto pb-8">
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-foreground mb-4">Profile</h2>
@@ -26,7 +27,6 @@ export function ProfileView() {
             </Button>
           </div>
         </Card>
-
         <div className="grid grid-cols-3 gap-3 mb-6">
           <Card className="p-3 bg-card border-border text-center">
             <p className="text-2xl font-bold text-primary">$4.2K</p>
@@ -44,7 +44,7 @@ export function ProfileView() {
       </div>
 
       {/* Settings Sections */}
-      <div className="space-y-4">
+      {/* <div className="space-y-4">
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Preferences</h3>
           <Card className="bg-card border-border divide-y divide-border">
@@ -89,7 +89,7 @@ export function ProfileView() {
               <Switch />
             </div>
           </Card>
-        </div>
+        </div> */}
 
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Connections</h3>
@@ -121,13 +121,13 @@ export function ProfileView() {
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Support</h3>
           <Card className="bg-card border-border divide-y divide-border">
-            <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
+            {/* <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
               <HelpCircle className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-foreground">Help Center</p>
                 <p className="text-xs text-muted-foreground">FAQs and guides</p>
               </div>
-            </button>
+            </button> */}
             <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors text-destructive">
               <LogOut className="w-5 h-5" />
               <div className="flex-1 text-left">
@@ -137,11 +137,10 @@ export function ProfileView() {
             </button>
           </Card>
         </div>
-      </div>
-
+      </div> 
       <div className="mt-6 text-center">
         <p className="text-xs text-muted-foreground">StellarFinance v1.0.0</p>
       </div>
-    </div>
+    </>
   )
 }
