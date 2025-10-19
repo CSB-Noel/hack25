@@ -2,7 +2,7 @@
 
 import { signIn, useSession } from "next-auth/react"
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Sparkles, Mail, Building2, ChevronRight, Check } from "lucide-react"
@@ -90,6 +90,9 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
     return (
       <Dialog open={open}>
+        <DialogHeader>
+          <DialogTitle> </DialogTitle>
+        </DialogHeader>
         <DialogContent className="max-w-md bg-background border-border p-0 overflow-hidden">
           <div className="relative h-[600px] flex flex-col">
             {/* Animated background */}

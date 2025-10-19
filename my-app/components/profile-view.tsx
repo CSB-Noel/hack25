@@ -146,7 +146,7 @@ export function ProfileView() {
         </div>
       </div> 
       <div className="mt-6 text-center">
-        <p className="text-xs text-muted-foreground">Orion v1.0.0</p>
+        <p className="text-xs text-muted-foreground">Pyxis v1.0.0</p>
       </div>
     </>
   )
