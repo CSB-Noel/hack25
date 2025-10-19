@@ -63,7 +63,7 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
 
 **IMPORTANT: Ensure the output is in json format
 
-    Use the following STRICT format for the output:
+Use the following STRICT format for the output:
 {
   id: string, // unique incremental ID
   kind: "subscription" | "bill" | "anomaly" | "goal" | "advice",
@@ -75,9 +75,10 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
   category: string, // e.g., "Shopping", "Utilities", "Subscriptions"
   delta30: number, // change vs last 30 days (estimate or 0 if unknown)
   delta90: number, // change vs last 90 days (estimate or 0 if unknown)
+  email: string, // summary of email body, focusing on the finances
   aiHeader: {
     bullets: string[], // 2–4 key AI insights
-    nextStep: string, // a recommended action
+    nextStep: string, // a recommended action, less than 5 words
     badges: string[], // short tags like ["priority", "priceUp", "duplicateSub", "dueSoon", "anomaly"]
     confidence: number // 0.0–1.0
   }
@@ -96,6 +97,7 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
     "category": "Entertainment",
     "delta30": 1.0,
     "delta90": 1.0,
+    “email”: “Spotify has updated its subscription pricing. Your monthly plan will now cost $10.99, up from $9.99. The new rate takes effect with your next billing cycle. You don’t need to take any action, but you can review your plan or cancel anytime in your account settings.”
     "aiHeader": {
       "bullets": [
         "Price up $1.00 vs last month",
@@ -103,11 +105,12 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
         "Low usage in past 60 days"
       ],
       "nextStep": "Keep Spotify, cancel Apple Music?",
-      "badges": ["priority", "priceUp", "duplicateSub"],
+      "badges": ["priority", "priceUp", "Subscriptions"],
       "confidence": 0.91
     }
   }
 ]
+
 `;
 
     // 2️⃣ Send emails to OpenRouter AI

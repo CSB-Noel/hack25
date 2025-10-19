@@ -26,6 +26,7 @@ interface Insight {
   category: string
   delta30: number
   delta90: number
+  email: string
   aiHeader: AIHeader
 }
 
@@ -206,8 +207,7 @@ export function InsightCard({
           {isExpanded && (
             <div className="pt-3 border-t border-border">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                This is a detailed view of the transaction. In a real app, this would show the full email thread,
-                transaction history, or additional context about this financial insight.
+                {insight.email}
               </p>
             </div>
           )}
@@ -222,7 +222,6 @@ export function InsightCard({
           <div className="space-y-2">
             <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25">
               {insight.aiHeader.nextStep}
-              <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
             <div className="flex gap-2">
               <Button 
