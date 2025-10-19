@@ -130,9 +130,268 @@ export function FeedView() {
 
   const handleBlackhole = (id: string) => {
     console.log("[v0] Blackhole action for insight:", id)
-    // Move to next card after deletion
-    if (currentIndex < sampleInsights.length - 1) {
-      setCurrentIndex(currentIndex + 1)
+    
+    // Remove card from visible cards
+    setVisibleCards(prev => {
+      const newCards = prev.filter(card => card.id !== id)
+      
+      // Adjust current index if needed using the new length
+      if (currentIndex >= newCards.length) {
+        setCurrentIndex(Math.max(0, newCards.length - 1))
+      }
+      
+      return newCards
+    })
+  }
+
+  const handleSnooze = (id: string) => {
+    console.log("[v0] Snooze action for insight:", id)
+    
+    // Move card to the end of the list
+    setVisibleCards(prev => {
+      const cardToSnooze = prev.find(card => card.id === id)
+      if (!cardToSnooze) return prev
+      
+      const otherCards = prev.filter(card => card.id !== id)
+      const newCards = [...otherCards, cardToSnooze]
+      
+      // Adjust current index if we're snoozing the current card
+      if (currentIndex >= otherCards.length) {
+        setCurrentIndex(Math.max(0, otherCards.length - 1))
+      }
+      
+      return newCards
+    })
+  }
+
+  const startHoldAnimation = () => {
+    console.log("Starting hold animation")
+    const startTime = Date.now()
+    const duration = 1000 // 1 second to full progress
+    
+    const updateProgress = () => {
+      const elapsed = Date.now() - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      setHoldProgress(progress)
+      
+      // Debug logging - show progress every 20%
+      if (progress > 0.1 && Math.floor(progress * 5) !== Math.floor((progress - 0.01) * 5)) {
+        console.log(`Hold progress: ${(progress * 100).toFixed(1)}%`)
+      }
+      
+      // If progress reaches 100%, trigger deletion immediately
+      if (progress >= 1 && !isDeleting) {
+        console.log("Hold progress reached 100%, triggering immediate deletion")
+        setIsDeleting(true)
+        handleBlackhole(visibleCards[currentIndex].id)
+        resetHoldState()
+        return // Stop the animation
+      }
+      
+      // Continue animation regardless of isPressHold state (it might get reset by movement)
+      if (progress < 1) {
+        holdAnimationRef.current = requestAnimationFrame(updateProgress)
+      }
+    }
+    holdAnimationRef.current = requestAnimationFrame(updateProgress)
+  }
+
+  const stopHoldAnimation = () => {
+    if (holdAnimationRef.current) {
+      cancelAnimationFrame(holdAnimationRef.current)
+      holdAnimationRef.current = undefined
+    }
+    setHoldProgress(0)
+  }
+
+  const resetHoldState = () => {
+    setIsPressHold(false)
+    isPressHoldRef.current = false
+    setIsDragging(false)
+    setHoldProgress(0)
+    setCardDragPosition(null)
+    setIsNearBlackhole(false)
+    setIsDeleting(false)
+    stopHoldAnimation()
+    
+    // Clear blackhole timer if it exists
+    if (blackholeTimer) {
+      clearTimeout(blackholeTimer)
+      setBlackholeTimer(null)
+    }
+  }
+
+  const handlePointerStart = (e: React.PointerEvent) => {
+    if (isTransitioning) return
+    
+    e.preventDefault()
+    setIsPointerDown(true)
+    setTouchStartY(e.clientY)
+    setTouchStartTime(Date.now())
+    setDragOffset(0)
+    
+    // Only reset if not already in a hold state
+    if (!isPressHold) {
+      setIsPressHold(false)
+      setIsDragging(false)
+      setHoldProgress(0)
+      setCardDragPosition(null)
+      setIsNearBlackhole(false)
+      setIsDeleting(false)
+    }
+
+    // Start press-and-hold timer
+    pressTimerRef.current = setTimeout(() => {
+      console.log("Hold timer triggered - entering blackhole mode")
+      setIsPressHold(true)
+      isPressHoldRef.current = true
+      setIsDragging(true)
+      startHoldAnimation()
+    }, 400)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (isTransitioning || !isPointerDown) return
+
+    e.preventDefault()
+    const deltaY = e.clientY - touchStartY
+    const deltaTime = Date.now() - touchStartTime
+
+    // Only clear press-and-hold timer if there's significant movement (not just small jitter)
+    if (pressTimerRef.current && Math.abs(deltaY) > 30) {
+      console.log("Significant movement detected, canceling hold timer")
+      clearTimeout(pressTimerRef.current)
+      stopHoldAnimation()
+      setIsPressHold(false)
+      isPressHoldRef.current = false
+    }
+
+    // If in press-hold mode, track card drag position for blackhole interaction
+    if (isPressHold) {
+      console.log("In blackhole mode - tracking drag position")
+      const cardX = e.clientX
+      const cardY = e.clientY
+      setCardDragPosition({ x: cardX, y: cardY })
+
+      // Calculate distance to blackhole (bottom center)
+      const blackholePosition = { 
+        x: window.innerWidth / 2, 
+        y: window.innerHeight - 128 // bottom-32
+      }
+      const distance = Math.sqrt(
+        Math.pow(cardX - blackholePosition.x, 2) + 
+        Math.pow(cardY - blackholePosition.y, 2)
+      )
+      
+      // Check if card is near blackhole threshold (150px) or at bottom of screen
+      const isNearThreshold = distance < 150
+      const isAtBottom = cardY > window.innerHeight - 150 // Increased threshold
+      
+      // Debug logging
+      if (cardY > window.innerHeight - 200) {
+        console.log(`Card Y: ${cardY}, Screen Height: ${window.innerHeight}, Threshold: ${window.innerHeight - 150}, IsAtBottom: ${isAtBottom}`)
+      }
+      
+      setIsNearBlackhole(isNearThreshold)
+      
+      // If card reaches bottom threshold, trigger deletion
+      if (isAtBottom) {
+        console.log("Card reached bottom threshold, triggering deletion")
+        setIsDeleting(true)
+        setTimeout(() => {
+          handleBlackhole(visibleCards[currentIndex].id)
+          resetHoldState()
+        }, 300)
+      }
+      return
+    }
+
+    // Handle normal swipe navigation (only if not in blackhole mode)
+    if (!isPressHold) {
+      // Calculate swipe threshold (15% of viewport height - lower threshold)
+      const swipeThreshold = window.innerHeight * 0.15
+      
+      // Check for quick swipe (within 300ms) or slow swipe (15% threshold)
+      const isQuickSwipe = deltaTime < 300 && Math.abs(deltaY) > 30
+      const isSlowSwipe = Math.abs(deltaY) > swipeThreshold
+
+      // Always update drag offset for live feedback, but limit it to prevent overshooting
+      if (isQuickSwipe || isSlowSwipe) {
+        // Limit drag offset to prevent excessive movement
+        const maxOffset = window.innerHeight * 0.3
+        setDragOffset(Math.max(-maxOffset, Math.min(maxOffset, deltaY)))
+      } else {
+        // For smaller movements, still show some feedback
+        setDragOffset(deltaY * 0.5)
+      }
+    }
+  }
+
+  const handlePointerEnd = () => {
+    if (isTransitioning) return
+
+    // Clear press-and-hold timer
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current)
+    }
+
+    setIsPointerDown(false)
+    const deltaY = dragOffset
+    const deltaTime = Date.now() - touchStartTime
+    const swipeThreshold = window.innerHeight * 0.15
+
+    // If in press-hold mode, handle blackhole deletion
+    if (isPressHold) {
+      if (isNearBlackhole) {
+        // Trigger deletion animation
+        setIsDeleting(true)
+        setTimeout(() => {
+          handleBlackhole(visibleCards[currentIndex].id)
+          resetHoldState()
+        }, 500)
+      } else {
+        // Cancel hold and reset card
+        resetHoldState()
+      }
+      return
+    }
+
+    // Check for swipe navigation
+    const isQuickSwipe = deltaTime < 300 && Math.abs(deltaY) > 30
+    const isSlowSwipe = Math.abs(deltaY) > swipeThreshold
+
+    if (isQuickSwipe || isSlowSwipe) {
+      // Clear drag offset immediately to prevent overshooting
+      setDragOffset(0)
+      setIsTransitioning(true)
+      
+      if (deltaY < 0 && currentIndex < visibleCards.length - 1) {
+        // Swipe up - next card
+        setCurrentIndex(currentIndex + 1)
+      } else if (deltaY > 0 && currentIndex > 0) {
+        // Swipe down - previous card
+        setCurrentIndex(currentIndex - 1)
+      }
+      
+      // Reset transition state after animation
+      setTimeout(() => {
+        setIsTransitioning(false)
+      }, 400)
+    } else {
+      // Bounce back if swipe wasn't sufficient
+      setDragOffset(0)
+    }
+  }
+
+  // Handle window leave to stop scrolling
+  const handlePointerLeave = () => {
+    if (isPointerDown) {
+      setIsPointerDown(false)
+      setDragOffset(0)
+      if (pressTimerRef.current) {
+        clearTimeout(pressTimerRef.current)
+      }
+      resetHoldState()
     }
   }
 
@@ -151,6 +410,7 @@ export function FeedView() {
                 onNext={handleNext}
                 onPrevious={handlePrevious}
                 onBlackhole={handleBlackhole}
+                onSnooze={handleSnooze}
                 onDragStart={() => setIsDragging(true)}
                 onDragEnd={() => setIsDragging(false)}
                 isPressHold={isPressHold}
