@@ -9,6 +9,7 @@ server.use(express.json());
 server.use(cors());
 
 let messagesWithDate = [];
+let authUrl = '';
 
 server.get('/emails', async (req, res) => {
   try {
@@ -59,6 +60,10 @@ server.get('/emails', async (req, res) => {
   }
 });
 
+server.get('/login', (req, res) => {
+  res.json({authUrl});
+});
+
 server.listen(5000, () => {
   console.log('Server is running on http://localhost:5000');
 });
@@ -87,7 +92,7 @@ function getNewToken(oAuth2Client) {
   const express = require('express');
   const app = express();
 
-  const authUrl = oAuth2Client.generateAuthUrl({
+  authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
   });
@@ -161,60 +166,3 @@ async function listMessages(auth) {
     // Sort newest first
     messagesWithDate.sort((a, b) => b.date - a.date);
 }
-
-
-
-
-
-// HTML and text
-async function listMessages2(auth) {
-const gmail = google.gmail({ version: 'v1', auth });
-const res = await gmail.users.messages.list({ userId: 'me', maxResults: 10 });
-const messages = res.data.messages;
-if (!messages || messages.length === 0) return console.log('No messages found.');
-
-
-const messagesWithDate = [];
-
-
-for (const msg of messages) {
-try {
-    const msgRes = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
-    const message = msgRes.data;
-
-
-    const decodeBase64 = (str) => Buffer.from(str, 'base64').toString('utf8');
-
-
-    let htmlBody = '';
-if (!message.payload.parts) {
-if (message.payload.mimeType === 'text/html') {
-htmlBody = decodeBase64(message.payload.body.data || '');
-}
-} else {
-const part = message.payload.parts.find(p => p.mimeType === 'text/html');
-htmlBody = part ? decodeBase64(part.body.data) : '';
-}
-
-
-const date = parseInt(message.internalDate);
-messagesWithDate.push({ htmlBody, date });
-
-
-} catch (err) {
-console.log('Error getting message:', err);
-}
-}
-
-
-// Sort newest first
-messagesWithDate.sort((a, b) => b.date - a.date);
-
-
-// Print full HTML bodies
-messagesWithDate.forEach(msg => {
-console.log(`\nDate: ${new Date(msg.date).toLocaleString()}`);
-console.log(`HTML Body:\n${msg.htmlBody}`);
-});
-}
-
