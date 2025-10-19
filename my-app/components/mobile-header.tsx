@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useSession, signOut } from "next-auth/react"
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import StarCrescentSolid from "./ui/star"
 
 export function MobileHeader() {
   const { data: session } = useSession()
@@ -19,11 +20,9 @@ export function MobileHeader() {
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-primary" />
-          </div>
-          <h1 className="text-lg font-semibold">StellarFinance</h1>
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <h1 className="text-lg title-font font-semibold">StellarFinance</h1>
+          <StarCrescentSolid size="20" />
         </div>
 
         <div className="flex-1">
