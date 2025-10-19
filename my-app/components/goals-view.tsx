@@ -82,6 +82,19 @@ export function GoalsView() {
   const [addTarget, setAddTarget] = React.useState<number | undefined>(undefined)
   const [addPercent, setAddPercent] = React.useState<number>(0)
 
+  // compute maximum percent that can be allocated without overflowing the goal
+  const maxAddPercent = React.useMemo(() => {
+    if (!addTarget || excessReserves <= 0) return 100
+    // percent = (addTarget / excessReserves) * 100
+    const pct = Math.floor((addTarget / excessReserves) * 100)
+    return Math.min(100, Math.max(0, pct))
+  }, [addTarget, excessReserves])
+
+  // clamp addPercent when max changes
+  React.useEffect(() => {
+    if (addPercent > maxAddPercent) setAddPercent(maxAddPercent)
+  }, [maxAddPercent])
+
   // Contribute dialog state
   const [contributeTarget, setContributeTarget] = React.useState<Goal | null>(null)
   const [contributeAmount, setContributeAmount] = React.useState<number>(0)
@@ -90,7 +103,10 @@ export function GoalsView() {
   const handleCreateGoal = () => {
     if (!addName || !addTarget) return
     // Amount taken from excess reserves = percentage of current excess reserves
-    const amount = Math.min(excessReserves, Math.round((addPercent / 100) * excessReserves * 100) / 100)
+    // desired amount based on selected percent of excess reserves (rounded to cents)
+    const desired = Math.round((addPercent / 100) * excessReserves * 100) / 100
+    // don't allocate more than we have, and never more than the goal's target (can't overfill on creation)
+    const amount = Math.round(Math.min(excessReserves, desired, addTarget) * 100) / 100
 
     const newGoal: Goal = {
       id: String(Date.now()),
@@ -177,16 +193,17 @@ export function GoalsView() {
                 <Input type="number" value={addTarget ?? ""} onChange={(e) => setAddTarget(Number((e.target as HTMLInputElement).value))} placeholder="500" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground block mb-1">Percent of excess reserves to allocate: {addPercent}%</label>
+                <label className="text-sm text-muted-foreground block mb-1">Percent of excess reserves to allocate: {addPercent}% (max {maxAddPercent}%)</label>
                 <input
                   type="range"
                   min={0}
-                  max={100}
+                  max={maxAddPercent}
                   value={addPercent}
                   onChange={(e) => setAddPercent(Number((e.target as HTMLInputElement).value))}
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground mt-1">Available excess reserves: ${excessReserves.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Max allocatable to this goal: ${Math.round(Math.min(excessReserves, addTarget ?? Infinity) * 100) / 100}</p>
               </div>
             </div>
 
