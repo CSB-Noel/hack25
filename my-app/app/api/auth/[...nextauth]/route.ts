@@ -6,6 +6,7 @@ declare module "next-auth" {
   interface Session {
     accessToken?: string | null
     error?: string
+    provider?: string
   }
 }
 
@@ -15,6 +16,7 @@ declare module "next-auth/jwt" {
     refreshToken?: string | null
     accessTokenExpires?: number
     error?: string
+    provider?: string
   }
 }
 
@@ -84,13 +86,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       // Initial sign in
       if (account) {
+        // Map provider: "google" -> "gmail", "azure-ad" -> "outlook"
+        const provider = account.provider === "google" ? "gmail" : account.provider === "azure-ad" ? "outlook" : account.provider;
+        
         return {
+          ...token, // Preserve name, email, picture, sub, etc.
           accessToken: account.access_token,
           refreshToken: account.refresh_token,
           accessTokenExpires: account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000,
+          provider: provider,
         }
       }
 
@@ -106,6 +113,11 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       session.accessToken = token.accessToken
       session.error = token.error
+      session.provider = token.provider
+      // Preserve user info in session
+      if (token.name) session.user = { ...session.user, name: token.name as string }
+      if (token.email) session.user = { ...session.user, email: token.email as string }
+      if (token.picture) session.user = { ...session.user, image: token.picture as string }
       return session
     },
   },

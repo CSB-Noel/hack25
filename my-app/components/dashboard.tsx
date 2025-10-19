@@ -7,6 +7,7 @@ import { BlackholeZone } from '@/components/blackhole-zone';
 import { json } from "stream/consumers";
 import { useStore } from '@/app/store';
 
+
 // Define the Insight type directly here
 type Insight = {
   id: string;
@@ -281,73 +282,46 @@ export default function Dashboard() {
   const [insights, setLocalInsights] = useState<Insight[] | null>(cachedInsights);
   const [loading, setLoading] = useState(cachedInsights === null);
 
-  const fetchAIResults = async () => {
+  const fetchAIResults = async (forceRefresh = false) => {
     setLoading(true);
     setIsDataLoading(true);
     
     try {
-      // Fetch both APIs in parallel
-      const [emailResult, nessieResult] = await Promise.allSettled([
-        // Email/Gmail API fetch
-        fetch('/api/ai-process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: 'gmail', maxResults: 20 }),
-        }).then(res => res.json()),
-        
-        // Nessie API fetch
-        fetch('http://localhost:8000/fetch_insights', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transactions: [] }),
-        }).then(res => res.json())
-      ]);
-
-      // Process email results
-      let emailInsights: Insight[] = [];
-      if (emailResult.status === 'fulfilled') {
-        const data = emailResult.value;
-        console.log("Email Log: ", data);
-        if (data.success && Array.isArray(data.result)) {
-          emailInsights = data.result;
-        } else {
-          console.error("Email API error:", data.error);
-        }
-      } else {
-        console.error("Email API fetch failed:", emailResult.reason);
-      }
-
-      // Process Nessie results
-      let nessieInsights: Insight[] = [];
-      if (nessieResult.status === 'fulfilled') {
-        const data = nessieResult.value;
-        console.log("Nessie Purchases:", data);
-        try {
-          const cleaned = data.result.replace(/```json\s*/i, "").replace(/```/g, "").trim();
-          nessieInsights = JSON.parse(cleaned);
-        } catch (parseErr) {
-          console.error("Failed to parse Nessie insights:", parseErr);
-        }
-      } else {
-        console.error("Nessie API fetch failed:", nessieResult.reason);
-      }
-
-      // Combine both results (even if one failed) and ensure amount defaults to 0 if null
-      const combinedInsights = [...emailInsights, ...nessieInsights].map(insight => ({
-        ...insight,
-        amount: insight.amount ?? 0
-      }));
-      setLocalInsights(combinedInsights);
-      setInsights(combinedInsights); // Cache in store
+      // Use the provider from session (set during auth)
+      // Falls back to gmail if provider isn't set (for backward compatibility)
+      const provider = (session as any)?.provider || 'gmail';
       
-    } catch (err) {
-      console.error("Unexpected error during fetch:", err);
-      setLocalInsights([]);
-      setInsights([]);
-    } finally {
-      setLoading(false);
-      setIsDataLoading(false);
-    }
+      console.log('🔍 Using provider:', provider);
+
+      if (!forceRefresh) {
+        const url = `/api/ai-process?provider=${provider}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.success && data.insights?.length > 0) {
+          setInsights(data.insights);
+          setLocalInsights(data.insights);
+          return;
+        }
+      }
+
+      // Fetch both APIs in parallel
+      const res = await fetch('/api/ai-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: provider, maxResults: 20 }),
+        });
+        const data = await res.json();
+        if (data.success && data.result) {
+          setInsights(data.result);
+          setLocalInsights(data.result);
+        }
+      } catch (err) {
+          console.error("Fetch insights failed:", err);
+      } finally {
+        setLoading(false);
+        setIsDataLoading(false);
+      }
+
   };
 
   useEffect(() => {

@@ -4,15 +4,78 @@ import { authOptions } from "../auth/[...nextauth]/route";
 // Assuming these imports are correctly set up
 import { GmailService } from "@/lib/gmail-service";
 import { OutlookService } from "@/lib/outlook-service";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-type CachedData = {
-  timestamp: number;
-  result: any;
-};
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
 
-// ✅ Top-level cache so it persists between requests
-const cache: Record<string, CachedData> = {};
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+    console.log("🔍 Session from /api/ai-process:", session);
+
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const provider = searchParams.get("provider"); // e.g. gmail
+
+    // 1️⃣ Fetch insights from Supabase (email-based)
+    const supabase = createSupabaseServerClient();
+    let query = supabase
+      .from("financial_insights")
+      .select("results")
+      .eq("user_email", session.user.email)
+      .order("created_at", { ascending: false });
+
+    if (provider) {
+      query = query.eq("provider", provider);
+    }
+
+    const { data: supabaseData, error: supabaseError } = await query;
+    if (supabaseError) throw supabaseError;
+
+    const emailInsights = supabaseData.flatMap((row: any) => row.insights || []);
+
+    // 2️⃣ Fetch Nessie insights from local Flask or FastAPI backend
+    let nessieInsights: any[] = [];
+    try {
+      const nessieRes = await fetch("http://localhost:8000/fetch_insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactions: [] }),
+      });
+
+      if (nessieRes.ok) {
+        const nessieData = await nessieRes.json();
+
+        // Handle raw AI responses that might come wrapped in code blocks
+        if (nessieData.result) {
+          const cleaned = nessieData.result.replace(/```json\s*/i, "").replace(/```/g, "").trim();
+          nessieInsights = JSON.parse(cleaned);
+        }
+      } else {
+        console.error("⚠️ Nessie API failed:", await nessieRes.text());
+      }
+    } catch (err) {
+      console.error("❌ Failed to fetch Nessie insights:", err);
+    }
+
+    // 3️⃣ Combine and clean
+    const combinedInsights = [...emailInsights, ...nessieInsights].map((insight) => ({
+      ...insight,
+      amount: insight.amount ?? 0,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      insights: combinedInsights,
+    });
+  } catch (error: any) {
+    console.error("❌ /api/ai-process GET error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,15 +89,6 @@ export async function POST(request: NextRequest) {
     if (!process.env.OPENROUTER_API_KEY) {
       console.error("FATAL: OPENROUTER_API_KEY is missing.");
       return NextResponse.json({ error: "AI service key missing" }, { status: 500 });
-    }
-
-    const cacheKey = `${session.user?.email}-${provider}`;
-    const cached = cache[cacheKey];
-
-    // ✅ Return cached result if still valid
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      console.log(`Cache hit for ${cacheKey}`);
-      return NextResponse.json({ success: true, result: cached.result });
     }
 
     // 1️⃣ Fetch emails
@@ -191,12 +245,27 @@ TASKS:
       summaryJson = [];
     }
     // --- END CRITICAL FIX ---
+    try {
+      const supabase = createSupabaseServerClient();
+      const { error: dbError } = await supabase
+        .from("financial_insights")
+        .insert({
+          user_email: session.user?.email,
+          provider,
+          results: summaryJson,
+          created_at: new Date().toISOString(),
+        });
+
+      if (dbError) {
+        console.error("⚠️ Failed to insert into Supabase:", dbError);
+      } else {
+        console.log("✅ Insights saved to Supabase");
+      }
+    } catch (e) {
+      console.error("⚠️ Supabase insert failed:", e);
+    }
 
 
-    cache[cacheKey] = {
-      timestamp: Date.now(),
-      result: summaryJson,
-    };
 
     return NextResponse.json({ success: true, result: summaryJson });
 
