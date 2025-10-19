@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useSession } from 'next-auth/react';
 import { InsightCard } from '@/components/insight-card';
 import { BlackholeZone } from '@/components/blackhole-zone';
-import { useStore } from '@/app/store';
+import { json } from "stream/consumers";
 
 // Define the Insight type directly here
 type Insight = {
@@ -276,13 +276,11 @@ function NoInsightsFound({ onRetry }: { onRetry: () => void }) {
 
 export default function Dashboard() {
   const { data: session } = useSession();
-  const { insights: cachedInsights, setInsights, isDataLoading, setIsDataLoading } = useStore();
-  const [insights, setLocalInsights] = useState<Insight[] | null>(cachedInsights);
-  const [loading, setLoading] = useState(cachedInsights === null);
+  const [insights, setInsights] = useState<Insight[] | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchAIResults = async () => {
     setLoading(true);
-    setIsDataLoading(true);
     try {
       const res = await fetch('/api/ai-process', {
         method: 'POST',
@@ -292,40 +290,35 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (data.success && Array.isArray(data.result)) {
-        setLocalInsights(data.result);
-        setInsights(data.result); // Cache in store
+        setInsights(data.result);
       } else {
         console.error(data.error);
-        setLocalInsights([]);
         setInsights([]);
       }
-        const res2 = await fetch('http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b', {
-        method: 'GET',
+      //http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b
+      const res2 = await fetch('http://localhost:8000/fetch_insights', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        });
-        const data2 = await res2.json();
-        console.log("Nessie Purchases:", data2);
+        body: JSON.stringify({ transactions: [] }),
+      });
+      const data2 = await res2.json();
+      console.log("Email Log: ", data);
+      console.log("Nessie Purchases:", data2);
+      const cleaned = data2.result.replace(/```json\s*/i, "").replace(/```/g, "").trim();
+      setInsights([...data.result, ...JSON.parse(cleaned)]);
+      
     } catch (err) {
       console.error(err);
-      setLocalInsights([]);
       setInsights([]);
     } finally {
       setLoading(false);
-      setIsDataLoading(false);
     }
   };
 
   useEffect(() => {
     if (!session) return;
-    
-    // Only fetch if we don't have cached data
-    if (cachedInsights === null) {
-      fetchAIResults();
-    } else {
-      setLocalInsights(cachedInsights);
-      setLoading(false);
-    }
-  }, [session, cachedInsights]);
+    fetchAIResults();
+  }, [session]);
 
   if (loading) return <CelestialLoadingScreen />;
   if (!insights || insights.length === 0) return <NoInsightsFound onRetry={fetchAIResults} />;

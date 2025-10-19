@@ -121,7 +121,7 @@ Use the following STRICT format for the output:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-preview-09-2025", // or another model like "mistral-7b" or "claude-3-haiku"
+        model: "google/gemini-2.5-flash", // or another model like "mistral-7b" or "claude-3-haiku"
         messages: [
           {
             role: "system",
