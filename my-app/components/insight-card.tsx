@@ -158,12 +158,12 @@ export function InsightCard({
 
         {/* Meta row */}
         <div className="p-4 space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
               <h3 className="text-xl font-semibold mb-1">{insight.title}</h3>
               <p className="text-sm text-muted-foreground">{insight.merchantOrBill}</p>
             </div>
-            <div className="text-right">
+            <div className="text-right flex-shrink-0">
               <p className={cn("text-2xl font-bold", insight.kind === "goal" ? "text-[#35e0b4]" : "text-foreground")}>
                 ${insight.amount.toFixed(2)}
               </p>
@@ -172,7 +172,7 @@ export function InsightCard({
 
           {/* Delta strip */}
           <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1">
+            {/* <div className="flex items-center gap-1">
               {insight.delta30 > 0 ? (
                 <TrendingUp className="w-4 h-4 text-[#f0616d]" />
               ) : (
@@ -193,8 +193,8 @@ export function InsightCard({
                 {insight.delta90 > 0 ? "+" : ""}
                 {insight.delta90.toFixed(1)}% 90d
               </span>
-            </div>
-            <Badge variant="outline" className="text-xs">
+            </div> */}
+            <Badge variant="outline" className="text-xs text-[#ffb380]">
               {insight.category}
             </Badge>
           </div>
@@ -220,7 +220,7 @@ export function InsightCard({
         {/* Action bar */}
         <div className="p-4 bg-muted/20 border-t border-border">
           <div className="space-y-2">
-            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25">
+            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 whitespace-normal h-auto py-2 px-4">
               {insight.aiHeader.nextStep}
             </Button>
             <div className="flex gap-2">

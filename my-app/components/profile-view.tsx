@@ -32,7 +32,7 @@ export function ProfileView() {
             </Button>
           </div>
         </Card>
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        {/* <div className="grid grid-cols-3 gap-3 mb-6">
           <Card className="p-3 bg-card border-border text-center">
             <p className="text-2xl font-bold text-primary">$4.2K</p>
             <p className="text-xs text-muted-foreground">Saved</p>
@@ -45,7 +45,7 @@ export function ProfileView() {
             <p className="text-2xl font-bold text-primary">4</p>
             <p className="text-xs text-muted-foreground">Goals</p>
           </Card>
-        </div>
+        </div> */}
         </>
       )}
       </div>
