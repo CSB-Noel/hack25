@@ -32,6 +32,10 @@ We implemented NextAuth for secure authentication, enabling users to log in with
 
 💻 Frontend UI
 The frontend was built using React and styled with TailwindCSS for a sleek and responsive user experience. We designed a dashboard-driven interface with interactive insight cards, dynamic charts, and clean visual feedback that makes the data feel alive. 
+
+🤖 AI Chatbot: We added an interactive chatbot powered by OpenRouter and Gemini, allowing users to ask questions and navigate the app more easily.
+
+
 🔗 [GitHub Repository](https://github.com/CSB-Noel/hack25)
 
 ---
