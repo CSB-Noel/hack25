@@ -163,6 +163,21 @@ Transactions:
     
 @app.post("/fetch_insights")
 def fetch_insights(request: InsightRequest):
+    nessie_url = "http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b"
+    nessie_transactions = []
+    try:
+        nessie_res = requests.get(nessie_url, headers={"Content-Type": "application/json"}, timeout=5)
+        if nessie_res.status_code == 200:
+            nessie_data = nessie_res.json()
+            if isinstance(nessie_data, list) and len(nessie_data) > 0:
+                nessie_transactions = nessie_data
+    except Exception as e:
+        print(f"[analyze] Nessie fetch failed: {e}")
+
+    txs = nessie_transactions
+    source = 'nessie'
+    
+            
     payload = {
         "model": "google/gemini-2.5-flash",
         "messages": [
@@ -216,7 +231,7 @@ Detector hints:
 Return JSON array only.
 
 Transactions:
-{json.dumps(request.transactions, ensure_ascii=False, indent=2)}
+{json.dumps(txs, ensure_ascii=False, indent=2)}
 
 """
                     }
