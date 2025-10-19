@@ -11,6 +11,7 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "sk-or-v1-dc9cc098ffd6
 class AnalyzeRequest(BaseModel):
     transactions: list
 
+#Analyze returns the category data. Used for the graph and the insights if necessary.
 @app.post("/analyze")
 def analyze(request: AnalyzeRequest):
     payload = {
@@ -112,3 +113,5 @@ Transactions:
         return {"result": message}
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
+    
+
