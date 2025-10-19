@@ -19,6 +19,7 @@ interface MerchantNode {
   spendVolume: number
   recency: number
   priority: number
+  transactionCount?: number
 }
 
 const mockMerchants: MerchantNode[] = [
@@ -117,15 +118,11 @@ export function ConstellationGraph() {
 
       // Draw connections with smooth highlight interpolation
       const currentNodes = nodesRef.current || []
-      const cats = categoriesRef.current || []
 
-      // collect edges from merchant->merchant and category->merchant
+      // collect edges from category->category connections
       const edges: Array<[string, string]> = []
-      currentNodes.forEach((m: any) => {
-        (m.connections || []).forEach((otherId: string) => edges.push([m.id, otherId]))
-      })
-      cats.forEach((c: any) => {
-        (c.connections || []).forEach((mid: string) => edges.push([c.id, mid]))
+      currentNodes.forEach((node: any) => {
+        (node.connections || []).forEach((otherId: string) => edges.push([node.id, otherId]))
       })
 
       // unique
@@ -140,8 +137,8 @@ export function ConstellationGraph() {
       })
 
       uniqueEdges.forEach(([a, b]) => {
-        const na = currentNodes.find((n: any) => n.id === a) || cats.find((c: any) => c.id === a)
-        const nb = currentNodes.find((n: any) => n.id === b) || cats.find((c: any) => c.id === b)
+        const na = currentNodes.find((n: any) => n.id === a)
+        const nb = currentNodes.find((n: any) => n.id === b)
         if (!na || !nb) return
         const x1 = (na.px ?? na.x) / 100 * canvas.width + (na.phase ? Math.sin(t + na.phase) * (na.ampX || 2) : 0)
         const y1 = (na.py ?? na.y) / 100 * canvas.height + (na.phase ? Math.cos(t + na.phase) * (na.ampY || 2) : 0)
@@ -168,73 +165,68 @@ export function ConstellationGraph() {
         ctx.stroke()
       })
 
-      // Draw nodes with subtle motion and hover/pulse effects
+      // Draw category nodes with subtle motion and hover/pulse effects
       let foundHover = false
-      const currentNodes2 = nodesRef.current || []
-      currentNodes2.forEach((merchant: any) => {
-        const node = merchant
+      const categoryNodes = nodesRef.current || []
+      categoryNodes.forEach((cat: any) => {
+        const node = cat
         const x = (node.px / 100) * canvas.width + Math.sin(t + node.phase) * node.ampX
         const y = (node.py / 100) * canvas.height + Math.cos(t + node.phase) * node.ampY
-        const baseRadius = 6 + (merchant.spendVolume / 500) * 2
-        const radius = Math.min(baseRadius, 12)
+        
+        // Make category nodes larger based on spend volume
+        const baseRadius = 8 + (cat.spendVolume / 300) * 3
+        const radius = Math.min(baseRadius, 18)
 
-        // Outer glow for ALL nodes (always visible, brighter on hover)
+        // Outer glow for ALL category nodes (always visible, brighter on hover)
         const currentHover = hoveredMerchantRef.current
-        const isHovered = currentHover === merchant.id
-        const glowIntensity = isHovered ? 0.4 : 0.25
-        const glowRadius = radius + 8
+        const isHovered = currentHover === cat.id
+        const glowIntensity = isHovered ? 0.5 : 0.3
+        const glowRadius = radius + 10
         
         ctx.beginPath()
         ctx.arc(x, y, glowRadius, 0, Math.PI * 2)
+        
+        // Use the category's actual color for its glow
+        const catColor = CATEGORY_COLOR_MAP[cat.name] || TYPE_COLOR_MAP.category
+        const r = parseInt(catColor.slice(1, 3), 16)
+        const g = parseInt(catColor.slice(3, 5), 16)
+        const b = parseInt(catColor.slice(5, 7), 16)
+        
         const gradient = ctx.createRadialGradient(x, y, radius, x, y, glowRadius)
-        const glowColor =
-          merchant.type === "goal"
-            ? `rgba(53, 224, 180, ${glowIntensity})`
-            : merchant.type === "subscription"
-              ? `rgba(255, 214, 110, ${glowIntensity})`
-              : `rgba(110, 168, 255, ${glowIntensity})`
-        gradient.addColorStop(0, glowColor)
-        gradient.addColorStop(1, "rgba(110, 168, 255, 0)")
+        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowIntensity})`)
+        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
         ctx.fillStyle = gradient
         ctx.fill()
 
-        // Node circle with type-based colors (slightly desaturated)
+        // Draw the category circle
         ctx.beginPath()
         ctx.arc(x, y, radius, 0, Math.PI * 2)
-
-        let fillColor = "#6ea8ff" // merchant
-        if (merchant.type === "subscription") fillColor = "#ffd66e"
-        else if (merchant.type === "category") fillColor = "#9fb3d1"
-        else if (merchant.type === "goal") fillColor = "#35e0b4"
-
-        // slight hover brighten
-        ctx.fillStyle = isHovered ? brighten(fillColor, 0.15) : fillColor
+        ctx.fillStyle = isHovered ? brighten(catColor, 0.15) : catColor
         ctx.fill()
 
         // Border
         ctx.strokeStyle = isHovered ? "#e6ecf8" : "rgba(230, 236, 248, 0.28)"
-        ctx.lineWidth = isHovered ? 2 : 1
+        ctx.lineWidth = isHovered ? 2.5 : 1.5
         ctx.stroke()
 
         // Pulse animation for recent activity (softer)
-        if (merchant.recency > 0.9) {
-          const pulseRadius = radius + 3 + Math.sin(Date.now() / 400) * 1.5
+        if (cat.recency > 0.9) {
+          const pulseRadius = radius + 4 + Math.sin(Date.now() / 400) * 2
           ctx.beginPath()
           ctx.arc(x, y, pulseRadius, 0, Math.PI * 2)
-          ctx.strokeStyle = `${fillColor}40`
-          ctx.lineWidth = 1
+          ctx.strokeStyle = `${catColor}40`
+          ctx.lineWidth = 1.5
           ctx.stroke()
         }
 
-        // if this is the hovered node, update hover label (throttled by small movement)
-        if (hoveredMerchantRef.current === merchant.id) {
+        // hover label for category nodes - use CATEGORY_LABEL_MAP for friendly names
+        if (hoveredMerchantRef.current === cat.id) {
           foundHover = true
-
-          // Estimate label size and clamp inside canvas bounds
-          const labelPaddingX = 12 // px padding (left+right)
-          const charWidth = 7 // approx px per char for small text
-          const merchantName = merchant.name || merchant.id
-          const estWidth = merchantName.length * charWidth + labelPaddingX
+          
+          const displayName = CATEGORY_LABEL_MAP[cat.name] || cat.name
+          const labelPaddingX = 12
+          const charWidth = 7
+          const estWidth = (displayName || '').toString().length * charWidth + labelPaddingX
           const estHeight = 28
 
           // default preferred location: above-right of node
@@ -255,93 +247,6 @@ export function ConstellationGraph() {
             ly = canvas.height - estHeight - 8
           }
 
-          const newLabel = { x: lx, y: ly, name: merchantName }
-          const prev = hoverLabelRef.current
-          if (
-            !prev ||
-            prev.name !== newLabel.name ||
-            Math.hypot(prev.x - newLabel.x, prev.y - newLabel.y) > 0.5
-          ) {
-            hoverLabelRef.current = newLabel
-            // update React state (will re-render label); small changes are ignored above
-            setHoverLabel(newLabel)
-          }
-        }
-      })
-
-      // draw category nodes and edges (read from ref to avoid effect deps)
-      const categoryNodes = categoriesRef.current || []
-      categoryNodes.forEach((cat) => {
-        // draw edges from category to connected merchants
-        const x1 = (cat.x / 100) * canvas.width
-        const y1 = (cat.y / 100) * canvas.height
-        cat.connections.forEach((connId: string) => {
-          const connMerchant = currentNodes.find((n: any) => n.id === connId)
-          if (!connMerchant) return
-          const x2 = (connMerchant.px / 100) * canvas.width + Math.sin(t + connMerchant.phase) * connMerchant.ampX
-          const y2 = (connMerchant.py / 100) * canvas.height + Math.cos(t + connMerchant.phase) * connMerchant.ampY
-          ctx.beginPath()
-          ctx.moveTo(x1, y1)
-          ctx.lineTo(x2, y2)
-          ctx.strokeStyle = 'rgba(53,224,180,0.18)'
-          ctx.lineWidth = 1
-          ctx.stroke()
-        })
-
-        // draw the category node (color from CATEGORY_COLOR_MAP when available)
-        const radius = Math.min(14, 6 + cat.spendVolume / 500)
-        const isHovered = hoveredMerchantRef.current === cat.id
-        
-        // Outer glow for ALL category nodes (always visible, brighter on hover)
-        const glowIntensity = isHovered ? 0.4 : 0.25
-        const glowRadius = radius + 8
-        
-        ctx.beginPath()
-        ctx.arc(x1, y1, glowRadius, 0, Math.PI * 2)
-        const catColor = CATEGORY_COLOR_MAP[cat.name] || TYPE_COLOR_MAP.category
-        const gradient = ctx.createRadialGradient(x1, y1, radius, x1, y1, glowRadius)
-        // Use the category's actual color for its glow
-        const r = parseInt(catColor.slice(1, 3), 16)
-        const g = parseInt(catColor.slice(3, 5), 16)
-        const b = parseInt(catColor.slice(5, 7), 16)
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${glowIntensity})`)
-        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
-        ctx.fillStyle = gradient
-        ctx.fill()
-        
-        // Draw the category circle
-        ctx.beginPath()
-        ctx.arc(x1, y1, radius, 0, Math.PI * 2)
-        ctx.fillStyle = isHovered ? brighten(catColor, 0.15) : catColor
-        ctx.fill()
-        ctx.strokeStyle = isHovered ? 'rgba(230,236,248,0.6)' : 'rgba(230,236,248,0.28)'
-        ctx.lineWidth = isHovered ? 2 : 1
-        ctx.stroke()
-
-        // hover label for category nodes - use CATEGORY_LABEL_MAP for friendly names
-        const displayName = CATEGORY_LABEL_MAP[cat.name] || cat.name
-        if (hoveredMerchantRef.current === cat.id) {
-          foundHover = true
-          const labelPaddingX = 12
-          const charWidth = 7
-          const estWidth = (displayName || '').toString().length * charWidth + labelPaddingX
-          const estHeight = 28
-
-          let lx = Math.round(x1 + radius + 8)
-          let ly = Math.round(y1 - radius - 8)
-
-          if (lx + estWidth > canvas.width - 8) {
-            lx = Math.round(x1 - radius - 8 - estWidth)
-          }
-          if (lx < 8) lx = 8
-
-          if (ly < 8) {
-            ly = Math.round(y1 + radius + 12)
-          }
-          if (ly + estHeight > canvas.height - 8) {
-            ly = canvas.height - estHeight - 8
-          }
-
           const newLabel = { x: lx, y: ly, name: displayName }
           const prev = hoverLabelRef.current
           if (!prev || prev.name !== newLabel.name || Math.hypot(prev.x - newLabel.x, prev.y - newLabel.y) > 0.5) {
@@ -349,7 +254,6 @@ export function ConstellationGraph() {
             setHoverLabel(newLabel)
           }
         }
-        // hover-only labels handled via hoverLabel state
       })
 
       if (!foundHover) {
@@ -412,23 +316,46 @@ export function ConstellationGraph() {
 
       // console.log('[ConstellationGraph] sample classified length:', normalized.classified.length)
 
-      // populate refs so the animation picks it up
-      const merchantsMap = new Map<string, any>()
+      // Build category nodes - aggregate ALL transactions by category
+      const categoriesMap = new Map<string, any>()
       normalized.classified.forEach((c: ClassifiedItem) => {
-        const mid = c.merchant_id || c.purchase_id || 'unknown'
-        const existing = merchantsMap.get(mid) || { id: mid, name: c.description || mid, connections: [], spendVolume: 0, recency: 0, priority: 0 }
-        existing.spendVolume = (existing.spendVolume || 0) + (c.amount || 0)
-        merchantsMap.set(mid, existing)
+        const catKey = c.category || 'Unknown'
+        if (!categoriesMap.has(catKey)) {
+          categoriesMap.set(catKey, { 
+            id: `cat-${categoriesMap.size}`, 
+            name: catKey, 
+            type: 'category',
+            connections: [], 
+            spendVolume: 0, 
+            recency: 0, 
+            priority: 0,
+            transactionCount: 0,
+          })
+        }
+        const node = categoriesMap.get(catKey)
+        node.spendVolume += c.amount || 0
+        node.transactionCount += 1
+        
+        // Update recency to most recent transaction
+        try {
+          const ts = new Date(c.purchase_date).getTime()
+          node.recency = Math.max(node.recency || 0, ts / Date.now())
+        } catch (e) {}
+        
+        // Update priority
+        node.priority = Math.max(node.priority || 0, c.confidence || 0)
       })
-      const merchantEntries = Array.from(merchantsMap.values())
-      // sanitize merchant node fields to safe ranges so drawing logic doesn't break
-      const merchantNodes = merchantEntries.map((m, i) => {
-        const sanitizedPriority = Math.max(0, Math.min(1, (m.priority ?? m.confidence ?? 0.5)))
-        const sanitizedRecency = Math.max(0, Math.min(1, (m.recency ?? 0.5)))
-        const sanitizedSpend = Math.max(0, (m.spendVolume ?? 0))
+      
+      const categoryEntries = Array.from(categoriesMap.values())
+      
+      // sanitize category node fields to safe ranges so drawing logic doesn't break
+      const categoryNodes = categoryEntries.map((cat, i) => {
+        const sanitizedPriority = Math.max(0, Math.min(1, (cat.priority ?? 0.5)))
+        const sanitizedRecency = Math.max(0, Math.min(1, (cat.recency ?? 0.5)))
+        const sanitizedSpend = Math.max(0, (cat.spendVolume ?? 0))
         // Use better spacing that fits within bounds
-        const cols = Math.ceil(Math.sqrt(merchantEntries.length))
-        const rows = Math.ceil(merchantEntries.length / cols)
+        const cols = Math.ceil(Math.sqrt(categoryEntries.length))
+        const rows = Math.ceil(categoryEntries.length / cols)
         const spacingX = 75 / Math.max(1, cols - 1)
         const spacingY = 75 / Math.max(1, rows - 1)
         const col = i % cols
@@ -437,50 +364,63 @@ export function ConstellationGraph() {
         const jitterY = (Math.random() - 0.5) * 10
         const baseX = 12 + col * spacingX + jitterX
         const baseY = 12 + row * spacingY + jitterY
-        const px = Math.max(8, Math.min(92, (m.px ?? baseX)))
-        const py = Math.max(8, Math.min(92, (m.py ?? baseY)))
-        const nodeType = (m.type === 'subscription' || m.type === 'category' || m.type === 'goal') ? m.type : 'merchant'
+        const px = Math.max(8, Math.min(92, baseX))
+        const py = Math.max(8, Math.min(92, baseY))
         return {
-          ...m,
-          type: nodeType,
+          ...cat,
           phase: Math.random() * Math.PI * 2,
           ampX: 2 + Math.random() * 3,
           ampY: 2 + Math.random() * 3,
           px,
           py,
+          x: baseX,
+          y: baseY,
           priority: sanitizedPriority,
           recency: sanitizedRecency,
           spendVolume: sanitizedSpend,
         }
       })
-      const categoriesMap = new Map<string, any>()
-      normalized.classified.forEach((c: ClassifiedItem) => {
-        const catKey = c.category || 'Unknown'
-        if (!categoriesMap.has(catKey)) categoriesMap.set(catKey, { id: `cat-${categoriesMap.size}`, name: catKey, connections: [], spendVolume: 0 })
-        const node = categoriesMap.get(catKey)
-        node.spendVolume += c.amount || 0
-        const mid = c.merchant_id || c.purchase_id || ''
-        if (mid && !node.connections.includes(mid)) node.connections.push(mid)
-      })
-      const cats = Array.from(categoriesMap.values()).map((c) => {
-        const baseX = 12 + Math.random() * 76
-        const baseY = 12 + Math.random() * 76
-        return {
-          ...c,
-          x: Math.max(8, Math.min(92, baseX)),
-          y: Math.max(8, Math.min(92, baseY)),
-          px: Math.max(8, Math.min(92, baseX)),
-          py: Math.max(8, Math.min(92, baseY)),
-          phase: 0,
-          ampX: 0,
-          ampY: 0,
+      
+      // Create proximity-based connections between category nodes
+      const connectionsPerNode = new Map<string, Set<string>>()
+      
+      categoryNodes.forEach(node => {
+        const distances: Array<{ id: string, dist: number }> = []
+        categoryNodes.forEach(other => {
+          if (node.id === other.id) return
+          const dx = (node.px || node.x) - (other.px || other.x)
+          const dy = (node.py || node.y) - (other.py || other.y)
+          const dist = Math.hypot(dx, dy)
+          distances.push({ id: other.id, dist })
+        })
+        
+        distances.sort((a, b) => a.dist - b.dist)
+        const numConnections = Math.min(2 + Math.floor(Math.random() * 3), distances.length)
+        
+        if (!connectionsPerNode.has(node.id)) {
+          connectionsPerNode.set(node.id, new Set())
+        }
+        
+        for (let i = 0; i < numConnections; i++) {
+          const targetId = distances[i].id
+          connectionsPerNode.get(node.id)!.add(targetId)
+          if (!connectionsPerNode.has(targetId)) {
+            connectionsPerNode.set(targetId, new Set())
+          }
+          connectionsPerNode.get(targetId)!.add(node.id)
         }
       })
+      
+      // Update category node connections from proximity algorithm
+      categoryNodes.forEach(c => {
+        const newConnections = Array.from(connectionsPerNode.get(c.id) || [])
+        c.connections = newConnections
+      })
 
-      nodesRef.current = merchantNodes
-      categoriesRef.current = cats
+      nodesRef.current = categoryNodes
+      categoriesRef.current = []
       setIsLoading(false)
-      // console.log('[ConstellationGraph] sample populated nodes:', merchantNodes.length, 'cats:', cats.length)
+      // console.log('[ConstellationGraph] sample populated category nodes:', categoryNodes.length)
     } catch (e) {
       console.warn('sample analyze failed', e)
     }
@@ -551,118 +491,85 @@ export function ConstellationGraph() {
         }
         const classifiedArray: ClassifiedItem[] = normalized.classified || []
 
-        // Build merchant nodes from classified transactions (group by merchant_id)
-        const merchantsMap = new Map<string, any>()
+        // Build category nodes - aggregate ALL transactions by category
+        const categoriesMap = new Map<string, any>()
         classifiedArray.forEach((c) => {
-          const mid = c.merchant_id || c.purchase_id || 'unknown'
-          const existing = merchantsMap.get(mid) || {
-            id: mid,
-            name: c.description || mid,
-            type: 'merchant',
-            connections: [] as string[],
-            spendVolume: 0,
-            recency: 0,
-            priority: 0,
+          const catKey = c.category || 'Unknown'
+          if (!categoriesMap.has(catKey)) {
+            categoriesMap.set(catKey, {
+              id: `cat-${categoriesMap.size}`,
+              name: catKey,
+              type: 'category',
+              connections: [],
+              spendVolume: 0,
+              recency: 0,
+              priority: 0,
+              transactionCount: 0,
+            })
           }
-          existing.spendVolume = (existing.spendVolume || 0) + (c.amount || 0)
+          const node = categoriesMap.get(catKey)
+          node.spendVolume += c.amount || 0
+          node.transactionCount += 1
+          
+          // Update recency to most recent transaction
           try {
             const ts = new Date(c.purchase_date).getTime()
-            existing.recency = Math.max(existing.recency || 0, ts / Date.now())
+            node.recency = Math.max(node.recency || 0, ts / Date.now())
           } catch (e) {}
-          existing.priority = Math.max(existing.priority || 0, c.confidence || 0)
-          merchantsMap.set(mid, existing)
+          
+          // Update priority
+          node.priority = Math.max(node.priority || 0, c.confidence || 0)
         })
 
-        const merchantEntries = Array.from(merchantsMap.values())
-        const mCnt = merchantEntries.length
-        const cols2 = Math.ceil(Math.sqrt(Math.max(1, mCnt)))
-        const rows2 = Math.ceil(mCnt / cols2)
-        // Increase spacing to spread nodes more across the canvas
-        const spacingX = 75 / Math.max(1, cols2 - 1)
-        const spacingY = 75 / Math.max(1, rows2 - 1)
-        // sanitize merchant nodes to ensure drawing math stays in safe ranges
-        const merchantNodes = merchantEntries.map((m: any, i: number) => {
-          const col = i % cols2
-          const row = Math.floor(i / cols2)
+        const categoryEntries = Array.from(categoriesMap.values())
+        const catCnt = categoryEntries.length
+        const cols = Math.ceil(Math.sqrt(Math.max(1, catCnt)))
+        const rows = Math.ceil(catCnt / cols)
+        // Increase spacing to spread category nodes across the canvas
+        const spacingX = 75 / Math.max(1, cols - 1)
+        const spacingY = 75 / Math.max(1, rows - 1)
+        
+        // Create category nodes with proper positioning and animation properties
+        const cats = categoryEntries.map((cat: any, i: number) => {
+          const col = i % cols
+          const row = Math.floor(i / cols)
           const jitterX = (Math.random() - 0.5) * 10
           const jitterY = (Math.random() - 0.5) * 10
           const baseX = 12 + col * spacingX + jitterX
           const baseY = 12 + row * spacingY + jitterY
-          const sanitizedPriority = Math.max(0, Math.min(1, (m.priority ?? m.confidence ?? 0.5)))
-          const sanitizedRecency = Math.max(0, Math.min(1, (m.recency ?? 0.5)))
-          const sanitizedSpend = Math.max(0, (m.spendVolume ?? 0))
+          
+          const sanitizedPriority = Math.max(0, Math.min(1, (cat.priority ?? 0.5)))
+          const sanitizedRecency = Math.max(0, Math.min(1, (cat.recency ?? 0.5)))
+          const sanitizedSpend = Math.max(0, (cat.spendVolume ?? 0))
+          
           const px = Math.max(8, Math.min(92, baseX))
           const py = Math.max(8, Math.min(92, baseY))
+          
           return {
-            id: m.id,
-            name: m.name || m.id,
-            type: 'merchant',
+            ...cat,
             x: baseX,
             y: baseY,
-            connections: m.connections || [],
+            px,
+            py,
             spendVolume: sanitizedSpend,
             recency: sanitizedRecency,
             priority: sanitizedPriority,
             phase: Math.random() * Math.PI * 2,
             ampX: 2 + Math.random() * 3,
             ampY: 2 + Math.random() * 3,
-            px,
-            py,
-          }
-        })
-
-        // Build category nodes
-        const categoriesMap = new Map<string, any>()
-        classifiedArray.forEach((c) => {
-          const catKey = c.category || 'Unknown'
-          if (!categoriesMap.has(catKey)) {
-            const idx = categoriesMap.size
-            categoriesMap.set(catKey, {
-              id: `cat-${idx}`,
-              name: catKey,
-              type: 'category',
-              x: 15 + (idx % 4) * 22,
-              y: 15 + Math.floor(idx / 4) * 22,
-              connections: [],
-              spendVolume: 0,
-              recency: 0.5,
-              priority: 0.6,
-            })
-          }
-          const node = categoriesMap.get(catKey)
-          node.spendVolume += c.amount || 0
-          const mid = c.merchant_id || c.purchase_id || ''
-          if (mid && !node.connections.includes(mid)) node.connections.push(mid)
-        })
-
-        const cats = Array.from(categoriesMap.values()).map((c, idx) => {
-          const baseX = 12 + Math.random() * 76
-          const baseY = 12 + Math.random() * 76
-          return {
-            ...c,
-            x: Math.max(8, Math.min(92, baseX)),
-            y: Math.max(8, Math.min(92, baseY)),
-            // Add these properties so edge drawing works correctly
-            px: Math.max(8, Math.min(92, baseX)),
-            py: Math.max(8, Math.min(92, baseY)),
-            phase: 0, // Categories don't animate
-            ampX: 0,
-            ampY: 0,
           }
         })
 
   if (cancelled) return
-  // console.log('[ConstellationGraph] built', merchantNodes.length, 'merchantNodes and', cats.length, 'categories')
+  // console.log('[ConstellationGraph] built', cats.length, 'category nodes (aggregated)')
 
-        // Create proximity-based connections (much faster than spanning tree)
-        // Each node connects to its 2-4 nearest neighbors
-        const allNodes = [...merchantNodes, ...cats]
+        // Create proximity-based connections between category nodes
         const connectionsPerNode = new Map<string, Set<string>>()
         
-        allNodes.forEach(node => {
-          // Calculate distances to all other nodes
+        cats.forEach(node => {
+          // Calculate distances to all other category nodes
           const distances: Array<{ id: string, dist: number }> = []
-          allNodes.forEach(other => {
+          cats.forEach(other => {
             if (node.id === other.id) return
             const dx = (node.px || node.x) - (other.px || other.x)
             const dy = (node.py || node.y) - (other.py || other.y)
@@ -689,25 +596,15 @@ export function ConstellationGraph() {
           }
         })
         
-        // Update node connections from proximity algorithm
-        merchantNodes.forEach(m => {
-          const newConnections = Array.from(connectionsPerNode.get(m.id) || [])
-          // Only include connections to other merchant nodes (not categories)
-          m.connections = newConnections.filter(id => merchantNodes.some(n => n.id === id))
-        })
-        
+        // Update category node connections from proximity algorithm
         cats.forEach(c => {
-          // Categories keep their original connections to merchants from classification
-          // But we can add proximity connections too
-          const proximityConnections = Array.from(connectionsPerNode.get(c.id) || [])
-          const merchantConnections = proximityConnections.filter(id => merchantNodes.some(n => n.id === id))
-          // Merge with existing connections
-          c.connections = Array.from(new Set([...c.connections, ...merchantConnections]))
+          const newConnections = Array.from(connectionsPerNode.get(c.id) || [])
+          c.connections = newConnections
         })
 
-        // write to refs used by animation
-  nodesRef.current = merchantNodes
-  categoriesRef.current = cats
+        // write to refs used by animation - now only category nodes, no merchant nodes
+  nodesRef.current = cats
+  categoriesRef.current = []
 
         setIsLoading(false)
         // console.log('[ConstellationGraph] setIsLoading(false)')
@@ -747,33 +644,18 @@ function brighten(hex: string, amt: number) {
     const clickX = e.clientX - rect.left
     const clickY = e.clientY - rect.top
 
-    // Check merchant nodes first
-    const nodes = nodesRef.current || []
+    // Check category nodes (now the only nodes)
+    const categoryNodes = nodesRef.current || []
     let clicked: any = null
-    for (const n of nodes) {
-      const x = (n.px / 100) * canvas.width + Math.sin(Date.now() / 1000 + n.phase) * n.ampX
-      const y = (n.py / 100) * canvas.height + Math.cos(Date.now() / 1000 + n.phase) * n.ampY
-      const baseRadius = 6 + (n.spendVolume / 500) * 2
-      const radius = Math.min(baseRadius, 12)
+    for (const cat of categoryNodes) {
+      const x = (cat.px / 100) * canvas.width + Math.sin(Date.now() / 1000 + cat.phase) * cat.ampX
+      const y = (cat.py / 100) * canvas.height + Math.cos(Date.now() / 1000 + cat.phase) * cat.ampY
+      const baseRadius = 8 + (cat.spendVolume / 300) * 3
+      const radius = Math.min(baseRadius, 18)
       const distance = Math.hypot(clickX - x, clickY - y)
       if (distance <= radius + 5) {
-        clicked = n
+        clicked = cat
         break
-      }
-    }
-
-    // If no merchant was clicked, check category nodes
-    if (!clicked) {
-      const cats = categoriesRef.current || []
-      for (const c of cats) {
-        const x = (c.x / 100) * canvas.width
-        const y = (c.y / 100) * canvas.height
-        const radius = Math.min(14, 6 + c.spendVolume / 500)
-        const distance = Math.hypot(clickX - x, clickY - y)
-        if (distance <= radius + 5) {
-          clicked = c
-          break
-        }
       }
     }
 
@@ -788,41 +670,17 @@ function brighten(hex: string, amt: number) {
     const mouseX = e.clientX - rect.left
     const mouseY = e.clientY - rect.top
 
-    // check animated merchant nodes first
-    const nodes = nodesRef.current || []
-    let found: any = null
-    for (const n of nodes) {
-      const x = (n.px / 100) * canvas.width + Math.sin(Date.now() / 1000 + n.phase) * n.ampX
-      const y = (n.py / 100) * canvas.height + Math.cos(Date.now() / 1000 + n.phase) * n.ampY
-      const baseRadius = 6 + (n.spendVolume / 500) * 2
-      const radius = Math.min(baseRadius, 12)
-      const distance = Math.hypot(mouseX - x, mouseY - y)
-      if (distance <= radius + 6) {
-        found = n
-        break
-      }
-    }
-
-    // if merchant found, set hover and return
-    if (found) {
-      hoveredMerchantRef.current = found.id
-      setHoveredMerchant(found.id)
-      // debug
-      // console.log intentionally left sparse to avoid spamming raf loop; log only when changed
-      console.log('[ConstellationGraph] hover merchant id=', found.id)
-      return
-    }
-
-    // otherwise check category nodes
-    const cats = categoriesRef.current || []
+    // check category nodes (now the only nodes)
+    const categoryNodes = nodesRef.current || []
     let foundCat: any = null
-    for (const c of cats) {
-      const x = (c.x / 100) * canvas.width
-      const y = (c.y / 100) * canvas.height
-      const radius = Math.min(14, 6 + c.spendVolume / 500)
+    for (const cat of categoryNodes) {
+      const x = (cat.px / 100) * canvas.width + Math.sin(Date.now() / 1000 + cat.phase) * cat.ampX
+      const y = (cat.py / 100) * canvas.height + Math.cos(Date.now() / 1000 + cat.phase) * cat.ampY
+      const baseRadius = 8 + (cat.spendVolume / 300) * 3
+      const radius = Math.min(baseRadius, 18)
       const distance = Math.hypot(mouseX - x, mouseY - y)
       if (distance <= radius + 6) {
-        foundCat = c
+        foundCat = cat
         break
       }
     }
@@ -902,23 +760,13 @@ function brighten(hex: string, amt: number) {
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h3 className="font-semibold text-foreground">
-                  {selectedMerchant.type === 'category' 
-                    ? (CATEGORY_LABEL_MAP[selectedMerchant.name] || selectedMerchant.name)
-                    : selectedMerchant.name}
+                  {CATEGORY_LABEL_MAP[selectedMerchant.name] || selectedMerchant.name}
                 </h3>
                 <p className="text-sm text-muted-foreground capitalize">{selectedMerchant.type}</p>
               </div>
               <Badge
                 variant="secondary"
-                className={
-                  selectedMerchant.type === "goal"
-                    ? "bg-[#35e0b4]/20 text-[#35e0b4]"
-                    : selectedMerchant.type === "subscription"
-                      ? "bg-[#ffd66e]/20 text-[#ffd66e]"
-                      : selectedMerchant.type === "category"
-                        ? "bg-[#9fb3d1]/20 text-[#9fb3d1]"
-                        : "bg-primary/20 text-primary"
-                }
+                className="bg-[#9fb3d1]/20 text-[#9fb3d1]"
               >
                 {selectedMerchant.type}
               </Badge>
@@ -927,13 +775,13 @@ function brighten(hex: string, amt: number) {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <DollarSign className="w-4 h-4" />
-                  {selectedMerchant.type === "goal" ? "Balance" : "Spend Volume"}
+                  Total Spend
                 </span>
                 <span className="font-semibold text-foreground">${selectedMerchant.spendVolume.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                {/* <span className="text-muted-foreground">Connections</span>
-                <span className="font-semibold text-foreground">{selectedMerchant.connections.length}</span> */}
+                <span className="text-muted-foreground">Transactions</span>
+                <span className="font-semibold text-foreground">{selectedMerchant.transactionCount || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Activity</span>
