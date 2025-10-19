@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/route";
+// Assuming these imports are correctly set up
 import { GmailService } from "@/lib/gmail-service";
 import { OutlookService } from "@/lib/outlook-service";
 
@@ -22,28 +23,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error("FATAL: OPENROUTER_API_KEY is missing.");
+      return NextResponse.json({ error: "AI service key missing" }, { status: 500 });
+    }
+
     const cacheKey = `${session.user?.email}-${provider}`;
     const cached = cache[cacheKey];
 
     // ✅ Return cached result if still valid
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`Cache hit for ${cacheKey}`);
       return NextResponse.json({ success: true, result: cached.result });
     }
 
     // 1️⃣ Fetch emails
-    let emailText = "";
     let emailJson: any[] = [];
     if (provider === "gmail") {
       const gmail = new GmailService(session.accessToken);
-      emailText = await gmail.getMessagesAsText(maxResults);
+      // NOTE: Using getMessages, not getMessagesAsText, as emailText is unused
       emailJson = await gmail.getMessages(maxResults);
     } else if (provider === "outlook") {
       const outlook = new OutlookService(session.accessToken);
-      emailText = await outlook.getMessagesAsText(maxResults);
+      // NOTE: Using getMessages, not getMessagesAsText, as emailText is unused
       emailJson = await outlook.getMessages(maxResults);
     } else {
       throw new Error("Unknown provider");
     }
+
+    // --- IMPORTANT DEBUGGING CHECK ---
+    console.log(`Emails Fetched: ${emailJson.length} for Provider: ${provider}`);
+    if (emailJson.length === 0) {
+        // If no emails are found, the AI would correctly return [], so we can return early.
+        return NextResponse.json({ success: true, result: [] });
+    }
+    // --- END DEBUGGING CHECK ---
 
 
     const prompt = `
@@ -97,7 +111,7 @@ Use the following STRICT format for the output:
     "category": "Entertainment",
     "delta30": 1.0,
     "delta90": 1.0,
-    “email”: “Spotify has updated its subscription pricing. Your monthly plan will now cost $10.99, up from $9.99. The new rate takes effect with your next billing cycle. You don’t need to take any action, but you can review your plan or cancel anytime in your account settings.”
+    "email": "Spotify has updated its subscription pricing. Your monthly plan will now cost $10.99, up from $9.99. The new rate takes effect with your next billing cycle. You don’t need to take any action, but you can review your plan or cancel anytime in your account settings.",
     "aiHeader": {
       "bullets": [
         "Price up $1.00 vs last month",
@@ -121,7 +135,7 @@ Use the following STRICT format for the output:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash", // or another model like "mistral-7b" or "claude-3-haiku"
+        model: "google/gemini-2.5-flash", 
         messages: [
           {
             role: "system",
@@ -146,25 +160,38 @@ TASKS:
             content: prompt,
           },
         ],
+        // You could also experiment with OpenRouter's 'format' parameter here
+        // if your model supports it for more reliable JSON output.
       }),
     });
 
     const aiData = await openRouterResponse.json();
 
     if (!openRouterResponse.ok) {
-      console.error("AI API Error:", aiData);
+      console.error("AI API Error Status:", openRouterResponse.status);
+      console.error("AI API Error Data:", aiData);
       throw new Error(aiData.error?.message || "Failed to fetch AI response");
     }
 
     const summary = aiData.choices?.[0]?.message?.content || "[]";
 
+    // --- CRITICAL FIX: Clean markdown fences before parsing ---
+    // This removes leading/trailing ```json\n or ``` tags which often break JSON.parse()
+    const cleanedSummary = summary.replace(/```json\n|```/g, '').trim();
+
     // 3️⃣ Return summary (or store in DB)
     let summaryJson;
     try {
-      summaryJson = JSON.parse(summary); // Parse AI JSON output
-    } catch {
+      summaryJson = JSON.parse(cleanedSummary); // Parse AI JSON output
+      console.log("JSON parsed successfully.");
+    } catch (e) {
+      console.error("❌ JSON Parse Failed on AI Output:", e);
+      console.error("❌ Raw (Cleaned) Content that failed parsing:", cleanedSummary);
+      // Fallback to empty array if parsing fails
       summaryJson = [];
     }
+    // --- END CRITICAL FIX ---
+
 
     cache[cacheKey] = {
       timestamp: Date.now(),
