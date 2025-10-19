@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { InsightCard } from "@/components/insight-card"
 import { BlackholeZone } from "@/components/blackhole-zone"
+
 
 // Sample financial insights data
 const sampleInsights = [
@@ -109,44 +110,22 @@ const sampleInsights = [
 export function FeedView() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [touchStartY, setTouchStartY] = useState(0)
-  const [touchStartTime, setTouchStartTime] = useState(0)
+  const [isNearBlackhole, setIsNearBlackhole] = useState(false)
   const [isPressHold, setIsPressHold] = useState(false)
-  const [isPointerDown, setIsPointerDown] = useState(false)
   const [holdProgress, setHoldProgress] = useState(0)
   const [cardDragPosition, setCardDragPosition] = useState<{x: number, y: number} | null>(null)
-  const [isNearBlackhole, setIsNearBlackhole] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [visibleCards, setVisibleCards] = useState(sampleInsights)
-  const [blackholeTimer, setBlackholeTimer] = useState<NodeJS.Timeout | null>(null)
-  const pressTimerRef = useRef<NodeJS.Timeout>()
-  const holdAnimationRef = useRef<number>()
-  const isPressHoldRef = useRef(false)
-
-  // Handle window blur to stop scrolling when user leaves window
-  useEffect(() => {
-    const handleWindowBlur = () => {
-      if (isPointerDown) {
-        setIsPointerDown(false)
-        setDragOffset(0)
-        if (pressTimerRef.current) {
-          clearTimeout(pressTimerRef.current)
-        }
-      }
-    }
-
-    window.addEventListener('blur', handleWindowBlur)
-    return () => window.removeEventListener('blur', handleWindowBlur)
-  }, [isPointerDown])
 
   const handleNext = () => {
-    setCurrentIndex((currentIndex + 1) % visibleCards.length)
+    if (currentIndex < sampleInsights.length - 1) {
+      setCurrentIndex(currentIndex + 1)
+    }
   }
 
   const handlePrevious = () => {
-    setCurrentIndex((currentIndex - 1) % visibleCards.length)
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1)
+    }
   }
 
   const handleBlackhole = (id: string) => {
@@ -417,24 +396,13 @@ export function FeedView() {
   }
 
   return (
-    <div 
-      className="relative h-[calc(100vh-8rem)] select-none"
-      onPointerDown={handlePointerStart}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-      onPointerLeave={handlePointerLeave}
-      style={{ touchAction: 'none', userSelect: 'none' }}
-    >
+    <div className="relative h-[calc(100vh-8rem)]">
       <div className="h-full overflow-hidden">
         <div
-          className="h-full"
-          style={{ 
-            transform: `translateY(calc(-${currentIndex * 100}% + ${isTransitioning ? 0 : dragOffset}px))`,
-            transition: isTransitioning ? 'transform 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none'
-          }}
+          className="h-full transition-transform duration-300 ease-out"
+          style={{ transform: `translateY(-${currentIndex * 100}%)` }}
         >
-          {visibleCards.map((insight, index) => (
+          {sampleInsights.map((insight, index) => (
             <div key={insight.id} className="h-full snap-start">
               <InsightCard
                 insight={insight}
@@ -455,14 +423,14 @@ export function FeedView() {
         </div>
       </div>
 
-      {/* Pagination dots - vertical on left side */}
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
-        {visibleCards.map((_, index) => (
+      {/* Pagination dots */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        {sampleInsights.map((_, index) => (
           <button
             key={index}
             onClick={() => setCurrentIndex(index)}
             className={`w-2 h-2 rounded-full transition-all ${
-              index === currentIndex ? "bg-primary h-6" : "bg-muted-foreground/30"
+              index === currentIndex ? "bg-primary w-6" : "bg-muted-foreground/30"
             }`}
           />
         ))}
@@ -471,11 +439,7 @@ export function FeedView() {
       <BlackholeZone 
         isActive={isDragging} 
         isNearBlackhole={isNearBlackhole}
-        onDrop={() => {
-          if (isPressHold) {
-            handleBlackhole(visibleCards[currentIndex].id)
-          }
-        }} 
+        onDrop={() => handleBlackhole(sampleInsights[currentIndex].id)}
       />
     </div>
   )
