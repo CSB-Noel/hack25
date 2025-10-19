@@ -23,8 +23,6 @@ interface MerchantNode {
   transactionCount?: number
 }
 
-const mockMerchants: MerchantNode[] = [
-]
 
   // mapping table for friendly category labels (kept for future use)
   const CATEGORY_LABEL_MAP: Record<string, string> = {
