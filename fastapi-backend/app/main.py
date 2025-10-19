@@ -6,7 +6,10 @@ import json
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 app = FastAPI()
-load_dotenv()
+# Explicitly load .env from the app directory
+from pathlib import Path
+dotenv_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Or ["http://localhost:3000"] for more security
@@ -15,7 +18,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "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")
+
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY:
+    raise RuntimeError("OPENROUTER_API_KEY is missing. Please set it in your .env file.")
+# Print masked key for debug
+print(f"[startup] OPENROUTER_API_KEY loaded: {OPENROUTER_API_KEY[:8]}...{'*' * (len(OPENROUTER_API_KEY)-12) if OPENROUTER_API_KEY else ''}{OPENROUTER_API_KEY[-4:] if OPENROUTER_API_KEY else ''}")
 
 # Load sample transactions from data.json (used instead of request.transactions)
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'data.json')
@@ -147,11 +155,15 @@ Transactions:
     # (already done above in the f-string)
 
     response = requests.post(
-        url="https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        },
-        json=payload
+    url="https://openrouter.ai/api/v1/chat/completions",
+    headers={
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "Financial Insights Analyzer",
+    },
+    json=payload,
+    timeout=60
     )
 
     if response.status_code == 200:
@@ -256,6 +268,9 @@ Transactions:
         url="https://openrouter.ai/api/v1/chat/completions",
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:3000",  # or your deployed frontend URL
+            "X-Title": "Financial Insights Analyzer",  # optional but helpful for OpenRouter logs
         },
         json=payload
     )
