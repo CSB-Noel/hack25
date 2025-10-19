@@ -1,15 +1,14 @@
 "use client"
 
-// star icon removed — title will be centered using CSS
+import StarCrescentSolid from "./ui/star"
 
-import { Mulish } from "next/font/google"
-const mulish = Mulish({ subsets: ["latin"], weight: ["800"] })
 export function MobileHeader() {
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
-        <div className="flex-1 flex items-center justify-center">
-          <h1 className={`text-lg title-font font-semibold ${mulish.className}`}>StellarFinance</h1>
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <h1 className="text-lg title-font font-semibold">StellarFinance</h1>
+          <StarCrescentSolid size="20" />
         </div>
 {/* 
         <div className="flex-1">
