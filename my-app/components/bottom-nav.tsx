@@ -2,6 +2,7 @@
 
 import { Sparkles, Map, List, Target, User } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useStore } from "@/app/store"
 
 interface BottomNavProps {
   activeTab: "feed" | "constellations" | "transactions" | "goals" | "profile"
@@ -17,6 +18,8 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     { key: "profile" as const, icon: User, label: "You" },
   ]
 
+  const incrementSlideChangeTrigger = useStore((state) => state.incrementSlideChangeTrigger)
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-xl border-t border-border">
       <div className="flex items-center justify-around h-20 max-w-md mx-auto px-4">
@@ -27,7 +30,10 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
           return (
             <button
               key={tab.key}
-              onClick={() => onTabChange(tab.key)}
+              onClick={() => {
+                onTabChange(tab.key)
+                incrementSlideChangeTrigger()
+              }}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 min-w-[64px] py-2 px-3 rounded-xl transition-all",
                 isActive && "bg-primary/10",
