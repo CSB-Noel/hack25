@@ -348,24 +348,41 @@ export function ConstellationGraph() {
       
       const categoryEntries = Array.from(categoriesMap.values())
       
-      // sanitize category node fields to safe ranges so drawing logic doesn't break
+      // Randomize positions and resolve overlaps
+      const assignedPositions: Array<{x: number, y: number}> = []
+      const minDist = 24 // minimum pixel distance between nodes
+      const maxTries = 100
+      const cols = Math.ceil(Math.sqrt(categoryEntries.length))
+      const rows = Math.ceil(categoryEntries.length / cols)
+      const spacingX = 75 / Math.max(1, cols - 1)
+      const spacingY = 75 / Math.max(1, rows - 1)
       const categoryNodes = categoryEntries.map((cat, i) => {
+        let tries = 0
+        let px, py, baseX, baseY
+        do {
+          const col = i % cols
+          const row = Math.floor(i / cols)
+          const jitterX = (Math.random() - 0.5) * 18
+          const jitterY = (Math.random() - 0.5) * 18
+          baseX = 12 + col * spacingX + jitterX
+          baseY = 12 + row * spacingY + jitterY
+          px = Math.max(8, Math.min(92, baseX))
+          py = Math.max(8, Math.min(92, baseY))
+          // Check for overlap with previous nodes
+          let overlap = false
+          for (const pos of assignedPositions) {
+            if (Math.hypot(pos.x - px, pos.y - py) < minDist) {
+              overlap = true
+              break
+            }
+          }
+          if (!overlap) break
+          tries++
+        } while (tries < maxTries)
+        assignedPositions.push({x: px, y: py})
         const sanitizedPriority = Math.max(0, Math.min(1, (cat.priority ?? 0.5)))
         const sanitizedRecency = Math.max(0, Math.min(1, (cat.recency ?? 0.5)))
         const sanitizedSpend = Math.max(0, (cat.spendVolume ?? 0))
-        // Use better spacing that fits within bounds
-        const cols = Math.ceil(Math.sqrt(categoryEntries.length))
-        const rows = Math.ceil(categoryEntries.length / cols)
-        const spacingX = 75 / Math.max(1, cols - 1)
-        const spacingY = 75 / Math.max(1, rows - 1)
-        const col = i % cols
-        const row = Math.floor(i / cols)
-        const jitterX = (Math.random() - 0.5) * 10
-        const jitterY = (Math.random() - 0.5) * 10
-        const baseX = 12 + col * spacingX + jitterX
-        const baseY = 12 + row * spacingY + jitterY
-        const px = Math.max(8, Math.min(92, baseX))
-        const py = Math.max(8, Math.min(92, baseY))
         return {
           ...cat,
           phase: Math.random() * Math.PI * 2,
@@ -529,22 +546,37 @@ export function ConstellationGraph() {
         const spacingX = 75 / Math.max(1, cols - 1)
         const spacingY = 75 / Math.max(1, rows - 1)
         
-        // Create category nodes with proper positioning and animation properties
+        // Randomize positions and resolve overlaps
+        const assignedPositions: Array<{x: number, y: number}> = []
+        const minDist = 24 // minimum pixel distance between nodes
+        const maxTries = 100
         const cats = categoryEntries.map((cat: any, i: number) => {
-          const col = i % cols
-          const row = Math.floor(i / cols)
-          const jitterX = (Math.random() - 0.5) * 10
-          const jitterY = (Math.random() - 0.5) * 10
-          const baseX = 12 + col * spacingX + jitterX
-          const baseY = 12 + row * spacingY + jitterY
-          
+          let tries = 0
+          let px, py, baseX, baseY
+          do {
+            const col = i % cols
+            const row = Math.floor(i / cols)
+            const jitterX = (Math.random() - 0.5) * 18
+            const jitterY = (Math.random() - 0.5) * 18
+            baseX = 12 + col * spacingX + jitterX
+            baseY = 12 + row * spacingY + jitterY
+            px = Math.max(8, Math.min(92, baseX))
+            py = Math.max(8, Math.min(92, baseY))
+            // Check for overlap with previous nodes
+            let overlap = false
+            for (const pos of assignedPositions) {
+              if (Math.hypot(pos.x - px, pos.y - py) < minDist) {
+                overlap = true
+                break
+              }
+            }
+            if (!overlap) break
+            tries++
+          } while (tries < maxTries)
+          assignedPositions.push({x: px, y: py})
           const sanitizedPriority = Math.max(0, Math.min(1, (cat.priority ?? 0.5)))
           const sanitizedRecency = Math.max(0, Math.min(1, (cat.recency ?? 0.5)))
           const sanitizedSpend = Math.max(0, (cat.spendVolume ?? 0))
-          
-          const px = Math.max(8, Math.min(92, baseX))
-          const py = Math.max(8, Math.min(92, baseY))
-          
           return {
             ...cat,
             x: baseX,
@@ -766,9 +798,14 @@ function brighten(hex: string, amt: number) {
               </div>
               <Badge
                 variant="secondary"
-                className="bg-[#9fb3d1]/20 text-[#9fb3d1]"
+                style={{
+                  background: `${(CATEGORY_COLOR_MAP[selectedMerchant.name] || TYPE_COLOR_MAP[selectedMerchant.type] || '#9fb3d1')}20`,
+                  color: CATEGORY_COLOR_MAP[selectedMerchant.name] || TYPE_COLOR_MAP[selectedMerchant.type] || '#9fb3d1',
+                  border: '1px solid ' + (CATEGORY_COLOR_MAP[selectedMerchant.name] || TYPE_COLOR_MAP[selectedMerchant.type] || '#9fb3d1'),
+                }}
               >
-                {selectedMerchant.type}
+                {/* {selectedMerchant.type} */}
+                Color
               </Badge>
             </div>
             <div className="space-y-2">
@@ -804,14 +841,14 @@ function brighten(hex: string, amt: number) {
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs">
+      {/* <div className="mt-4 flex flex-wrap items-center gap-4 text-xs">
         {Object.entries(TYPE_COLOR_MAP).map(([typeKey, color]) => (
           <div key={typeKey} className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full" style={{ background: color }} />
             <span className="text-muted-foreground">{typeKey.charAt(0).toUpperCase() + typeKey.slice(1)}</span>
           </div>
         ))}
-      </div>
+      </div> */}
     </div>
   )
 }

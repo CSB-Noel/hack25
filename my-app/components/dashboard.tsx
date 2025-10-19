@@ -294,6 +294,12 @@ export default function Dashboard() {
         console.error(data.error);
         setInsights([]);
       }
+        const res2 = await fetch('http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        });
+        const data2 = await res2.json();
+        console.log("Nessie Purchases:", data2);
     } catch (err) {
       console.error(err);
       setInsights([]);

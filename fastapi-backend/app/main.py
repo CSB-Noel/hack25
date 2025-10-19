@@ -32,9 +32,32 @@ class InsightRequest(BaseModel):
     transactions: list
 
 
-#Analyze returns the category data. Used for the graph and the insights if necessary.
 @app.post("/analyze")
 def analyze(request: AnalyzeRequest):
+    # Try to fetch Nessie purchases
+    nessie_url = "http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b"
+    nessie_transactions = []
+    try:
+        nessie_res = requests.get(nessie_url, headers={"Content-Type": "application/json"}, timeout=5)
+        if nessie_res.status_code == 200:
+            nessie_data = nessie_res.json()
+            if isinstance(nessie_data, list) and len(nessie_data) > 0:
+                nessie_transactions = nessie_data
+    except Exception as e:
+        print(f"[analyze] Nessie fetch failed: {e}")
+
+    # prefer incoming request.transactions, then Nessie, then data.json
+    if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0:
+        txs = request.transactions
+        source = 'request'
+    elif len(nessie_transactions) > 0:
+        txs = nessie_transactions
+        source = 'nessie'
+    else:
+        txs = DATA.get('transactions', [])
+        source = 'data.json'
+    print(f"[analyze] sending {len(txs)} transactions from {source} to OpenRouter")
+
     payload = {
         "model": "google/gemini-2.5-flash",
         "messages": [
@@ -110,7 +133,7 @@ CONSTRAINTS
 - Do not include insights or additional sections.
 
 Transactions:
-{json.dumps(DATA.get('transactions', []), ensure_ascii=False, indent=2)}
+{json.dumps(txs, ensure_ascii=False, indent=2)}
 
 """
                     }
@@ -120,16 +143,8 @@ Transactions:
         "temperature": 0.5,
     }
 
-    # prefer incoming request.transactions when provided, otherwise fall back to data.json
-    txs = request.transactions if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0 else DATA.get('transactions', [])
-    source = 'request' if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0 else 'data.json'
-    print(f"[analyze] sending {len(txs)} transactions from {source} to OpenRouter")
-
     # inject the chosen transactions into the prompt payload
-    payload['messages'][1]['content'][0]['text'] = payload['messages'][1]['content'][0]['text'].replace(
-        json.dumps(DATA.get('transactions', []), ensure_ascii=False, indent=2),
-        json.dumps(txs, ensure_ascii=False, indent=2)
-    )
+    # (already done above in the f-string)
 
     response = requests.post(
         url="https://openrouter.ai/api/v1/chat/completions",
