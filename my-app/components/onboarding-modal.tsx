@@ -1,7 +1,6 @@
 "use client"
 
-import { signIn, useSession } from "next-auth/react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -17,14 +16,6 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [connectedEmail, setConnectedEmail] = useState(false)
   const [connectedBank, setConnectedBank] = useState(false)
-  const { data: session, status } = useSession()
-
-  // Update connectedEmail state when session changes
-  useEffect(() => {
-    if (session?.user) {
-      setConnectedEmail(true)
-    }
-  }, [session])
 
   const slides = [
     {
@@ -56,24 +47,10 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
     }
   }
 
-  const handleConnectEmail = async (provider: "google" | "microsoft") => {
-    try {
-      const result = await signIn(provider, { 
-        redirect: false,
-        callbackUrl: window.location.href 
-      })
-      
-      if (result?.error) {
-        console.error("Authentication error:", result.error)
-      } else if (result?.ok) {
-        // Authentication successful, session will be updated automatically
-        console.log("Authentication successful")
-      }
-    } catch (error) {
-      console.error("Sign in error:", error)
-    }
+  const handleConnectEmail = () => {
+    // In a real app, this would trigger OAuth flow
+    setConnectedEmail(true)
   }
-
 
   const handleConnectBank = () => {
     // In a real app, this would trigger Nessie/Plaid connection
@@ -166,7 +143,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleConnectEmail("google")}
+                        onClick={handleConnectEmail}
                         className="flex-1 bg-transparent"
                       >
                         Gmail
@@ -174,14 +151,14 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleConnectEmail("microsoft")}
+                        onClick={handleConnectEmail}
                         className="flex-1 bg-transparent"
                       >
                         Outlook
                       </Button>
                     </div>
                   ) : (
-                    <p className="text-xs text-[#35e0b4]">{session?.user?.email || "Connected"}</p>
+                    <p className="text-xs text-[#35e0b4]">alex.morgan@gmail.com</p>
                   )}
                 </div>
               </div>

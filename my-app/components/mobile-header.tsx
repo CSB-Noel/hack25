@@ -1,21 +1,9 @@
 "use client"
 
-import { Sparkles, LogOut, User } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { useSession, signOut } from "next-auth/react"
-import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 export function MobileHeader() {
-  const { data: session } = useSession()
-  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
-
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: "/" })
-    setIsLogoutDialogOpen(false)
-  }
-
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
@@ -28,7 +16,9 @@ export function MobileHeader() {
 {/* 
         <div className="flex-1">
           <Input placeholder="Search transactions…" className="bg-card border-border text-sm h-10" />
+<<<<<<< Updated upstream
         </div>
+=======
         </div> */}
 
         {/* User menu */}
@@ -65,6 +55,7 @@ export function MobileHeader() {
             </DialogContent>
           </Dialog>
         )}
+>>>>>>> Stashed changes
       </div>
     </header>
   )
