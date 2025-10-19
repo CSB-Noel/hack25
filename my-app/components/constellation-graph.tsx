@@ -103,6 +103,9 @@ export function ConstellationGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [selectedMerchant, setSelectedMerchant] = useState<MerchantNode | null>(null)
   const [hoveredMerchant, setHoveredMerchant] = useState<string | null>(null)
+  const hoveredMerchantRef = useRef<string | null>(null)
+  const hoverLabelRef = useRef<{ x: number; y: number; name: string } | null>(null)
+  const [hoverLabel, setHoverLabel] = useState<{ x: number; y: number; name: string } | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -121,63 +124,107 @@ export function ConstellationGraph() {
     setCanvasSize()
     window.addEventListener("resize", setCanvasSize)
 
+  // create animated node state (local to this effect)
+    const nodes = mockMerchants.map((m) => ({
+      ...m,
+      phase: Math.random() * Math.PI * 2,
+      ampX: 2 + Math.random() * 4,
+      ampY: 2 + Math.random() * 4,
+      // px/py are base percentage positions (0-100)
+      px: m.x,
+      py: m.y,
+    }))
+
+    // per-edge highlight progress map (keyed by sorted id pair)
+    const edgeProgress = new Map<string, number>()
+    const edgeTarget = (a: string, b: string) => {
+      const key = [a, b].sort().join("-")
+      return edgeProgress.get(key) || 0
+    }
+
+    const setEdge = (a: string, b: string, v: number) => {
+      const key = [a, b].sort().join("-")
+      edgeProgress.set(key, v)
+    }
+
+    // initialize edges
+    mockMerchants.forEach((m) => {
+      m.connections.forEach((c) => setEdge(m.id, c, 0))
+    })
+
+  let raf = 0
+
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // Draw connections
+      const t = Date.now() / 1000
+
+      // Draw connections with smooth highlight interpolation
       mockMerchants.forEach((merchant) => {
-        const x1 = (merchant.x / 100) * canvas.width
-        const y1 = (merchant.y / 100) * canvas.height
+        const nodeA = nodes.find((n) => n.id === merchant.id)!
+        const x1 = (nodeA.px / 100) * canvas.width + Math.sin(t + nodeA.phase) * nodeA.ampX
+        const y1 = (nodeA.py / 100) * canvas.height + Math.cos(t + nodeA.phase) * nodeA.ampY
 
         merchant.connections.forEach((connId) => {
-          const connMerchant = mockMerchants.find((m) => m.id === connId)
+          const connMerchant = nodes.find((n) => n.id === connId)
           if (connMerchant) {
-            const x2 = (connMerchant.x / 100) * canvas.width
-            const y2 = (connMerchant.y / 100) * canvas.height
+            const x2 = (connMerchant.px / 100) * canvas.width + Math.sin(t + connMerchant.phase) * connMerchant.ampX
+            const y2 = (connMerchant.py / 100) * canvas.height + Math.cos(t + connMerchant.phase) * connMerchant.ampY
+
+            // edge key and target highlight
+            const key = [merchant.id, connId].sort().join("-")
+            const currentHover = hoveredMerchantRef.current
+            const target = currentHover === merchant.id || currentHover === connId ? 1 : 0
+            const current = edgeProgress.get(key) || 0
+            const lerped = current + (target - current) * 0.12 // smooth interpolation
+            edgeProgress.set(key, lerped)
+
+            // visual parameters based on progress and priority
+            const prog = lerped
+            const isPriority = merchant.priority > 0.7 && connMerchant.priority > 0.7
+            const baseAlpha = isPriority ? 0.28 : 0.12
+            const alpha = baseAlpha + prog * 0.7
+            const width = 1 + prog * 2
 
             ctx.beginPath()
             ctx.moveTo(x1, y1)
             ctx.lineTo(x2, y2)
-
-            const isHighlighted = hoveredMerchant === merchant.id || hoveredMerchant === connId
-            const isPriority = merchant.priority > 0.7 && connMerchant.priority > 0.7
-
-            ctx.strokeStyle = isHighlighted
-              ? "rgba(110, 168, 255, 0.8)"
-              : isPriority
-                ? "rgba(110, 168, 255, 0.3)"
-                : "rgba(110, 168, 255, 0.15)"
-            ctx.lineWidth = isHighlighted ? 2 : 1
+            ctx.strokeStyle = `rgba(110,168,255,${alpha})`
+            ctx.lineWidth = width
+            ctx.lineCap = "round"
             ctx.stroke()
           }
         })
       })
 
-      // Draw nodes
+      // Draw nodes with subtle motion and hover/pulse effects
+      let foundHover = false
       mockMerchants.forEach((merchant) => {
-        const x = (merchant.x / 100) * canvas.width
-        const y = (merchant.y / 100) * canvas.height
+        const node = nodes.find((n) => n.id === merchant.id)!
+        const x = (node.px / 100) * canvas.width + Math.sin(t + node.phase) * node.ampX
+        const y = (node.py / 100) * canvas.height + Math.cos(t + node.phase) * node.ampY
         const baseRadius = 6 + (merchant.spendVolume / 500) * 2
         const radius = Math.min(baseRadius, 12)
 
-        // Outer glow for high priority or hovered
-        if (hoveredMerchant === merchant.id || merchant.priority > 0.8) {
+        // Outer glow for high priority or hovered (subtle)
+  const currentHover = hoveredMerchantRef.current
+  if (currentHover === merchant.id || merchant.priority > 0.8) {
           ctx.beginPath()
-          ctx.arc(x, y, radius + 10, 0, Math.PI * 2)
-          const gradient = ctx.createRadialGradient(x, y, radius, x, y, radius + 10)
+          ctx.arc(x, y, radius + 12 * (merchant.priority || 0.5), 0, Math.PI * 2)
+          const gradient = ctx.createRadialGradient(x, y, radius, x, y, radius + 12)
           const glowColor =
             merchant.type === "goal"
-              ? "rgba(53, 224, 180, 0.4)"
+              ? "rgba(53, 224, 180, 0.28)"
               : merchant.type === "subscription"
-                ? "rgba(255, 214, 110, 0.4)"
-                : "rgba(110, 168, 255, 0.4)"
+                ? "rgba(255, 214, 110, 0.28)"
+                : "rgba(110, 168, 255, 0.28)"
           gradient.addColorStop(0, glowColor)
           gradient.addColorStop(1, "rgba(110, 168, 255, 0)")
           ctx.fillStyle = gradient
           ctx.fill()
         }
 
-        // Node circle with type-based colors
+        // Node circle with type-based colors (slightly desaturated)
         ctx.beginPath()
         ctx.arc(x, y, radius, 0, Math.PI * 2)
 
@@ -186,33 +233,102 @@ export function ConstellationGraph() {
         else if (merchant.type === "category") fillColor = "#9fb3d1"
         else if (merchant.type === "goal") fillColor = "#35e0b4"
 
-        ctx.fillStyle = fillColor
+        // slight hover brighten
+  const isHovered = hoveredMerchantRef.current === merchant.id
+        ctx.fillStyle = isHovered ? brighten(fillColor, 0.15) : fillColor
         ctx.fill()
 
         // Border
-        ctx.strokeStyle = hoveredMerchant === merchant.id ? "#e6ecf8" : "rgba(230, 236, 248, 0.3)"
-        ctx.lineWidth = hoveredMerchant === merchant.id ? 2 : 1
+        ctx.strokeStyle = isHovered ? "#e6ecf8" : "rgba(230, 236, 248, 0.28)"
+        ctx.lineWidth = isHovered ? 2 : 1
         ctx.stroke()
 
-        // Pulse animation for recent activity
+        // Pulse animation for recent activity (softer)
         if (merchant.recency > 0.9) {
-          const pulseRadius = radius + 3 + Math.sin(Date.now() / 500) * 2
+          const pulseRadius = radius + 3 + Math.sin(Date.now() / 400) * 1.5
           ctx.beginPath()
           ctx.arc(x, y, pulseRadius, 0, Math.PI * 2)
           ctx.strokeStyle = `${fillColor}40`
           ctx.lineWidth = 1
           ctx.stroke()
         }
+
+        // if this is the hovered node, update hover label (throttled by small movement)
+        if (hoveredMerchantRef.current === merchant.id) {
+          foundHover = true
+
+          // Estimate label size and clamp inside canvas bounds
+          const labelPaddingX = 12 // px padding (left+right)
+          const charWidth = 7 // approx px per char for small text
+          const estWidth = merchant.name.length * charWidth + labelPaddingX
+          const estHeight = 28
+
+          // default preferred location: above-right of node
+          let lx = Math.round(x + radius + 8)
+          let ly = Math.round(y - radius - 8)
+
+          // clamp horizontally
+          if (lx + estWidth > canvas.width - 8) {
+            lx = Math.round(x - radius - 8 - estWidth)
+          }
+          if (lx < 8) lx = 8
+
+          // clamp vertically (if goes above top, put below node)
+          if (ly < 8) {
+            ly = Math.round(y + radius + 12)
+          }
+          if (ly + estHeight > canvas.height - 8) {
+            ly = canvas.height - estHeight - 8
+          }
+
+          const newLabel = { x: lx, y: ly, name: merchant.name }
+          const prev = hoverLabelRef.current
+          if (
+            !prev ||
+            prev.name !== newLabel.name ||
+            Math.hypot(prev.x - newLabel.x, prev.y - newLabel.y) > 0.5
+          ) {
+            hoverLabelRef.current = newLabel
+            // update React state (will re-render label); small changes are ignored above
+            setHoverLabel(newLabel)
+          }
+        }
       })
 
-      requestAnimationFrame(animate)
+      if (!foundHover && hoverLabelRef.current) {
+        hoverLabelRef.current = null
+        setHoverLabel(null)
+      }
+
+      raf = requestAnimationFrame(animate)
     }
     animate()
 
     return () => {
       window.removeEventListener("resize", setCanvasSize)
+      // cancel animation frame
+      // @ts-ignore
+      cancelAnimationFrame(raf)
     }
-  }, [hoveredMerchant])
+  }, [])
+
+
+// small helper to brighten a hex color by fraction (0-1)
+function brighten(hex: string, amt: number) {
+  try {
+    const col = hex.replace('#','')
+    const num = parseInt(col,16)
+    let r = (num >> 16) + Math.round(255*amt)
+    let g = ((num >> 8) & 0x00FF) + Math.round(255*amt)
+    let b = (num & 0x0000FF) + Math.round(255*amt)
+    r = Math.min(255, r)
+    g = Math.min(255, g)
+    b = Math.min(255, b)
+    return `rgb(${r},${g},${b})`
+  } catch (e) {
+    return hex
+  }
+}
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -251,6 +367,8 @@ export function ConstellationGraph() {
       return distance <= radius + 5
     })
 
+    // set both ref and state; animation loop reads the ref to avoid reinitialization
+    hoveredMerchantRef.current = hovered?.id || null
     setHoveredMerchant(hovered?.id || null)
   }
 
@@ -262,15 +380,28 @@ export function ConstellationGraph() {
       </div>
 
       <div className="relative">
-        <Card className="bg-card border-border overflow-hidden">
+  <Card className="bg-card/40 backdrop-blur-md border border-border overflow-hidden">
           <div className="relative h-[450px]">
             <canvas
               ref={canvasRef}
               onClick={handleCanvasClick}
               onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => setHoveredMerchant(null)}
-              className="w-full h-full cursor-pointer"
+              onMouseLeave={() => { hoveredMerchantRef.current = null; setHoveredMerchant(null) }}
+              className="w-full h-full cursor-pointer bg-transparent"
+              style={{ background: 'transparent' }}
             />
+
+            {/* Hover label rendered as HTML for crisp text */}
+            {hoverLabel && (
+              <div
+                className="pointer-events-none absolute z-50 transform -translate-y-full"
+                style={{ left: hoverLabel.x, top: hoverLabel.y }}
+              >
+                <div className="bg-background/90 text-foreground text-sm px-3 py-1 rounded-md shadow-md border border-border">
+                  {hoverLabel.name}
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
