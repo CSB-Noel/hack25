@@ -35,6 +35,7 @@ interface InsightCardProps {
   onNext: () => void
   onPrevious: () => void
   onBlackhole: (id: string) => void
+  onSnooze: (id: string) => void
   onDragStart: () => void
   onDragEnd: () => void
   isPressHold: boolean
@@ -49,6 +50,7 @@ export function InsightCard({
   onNext,
   onPrevious,
   onBlackhole,
+  onSnooze,
   onDragStart,
   onDragEnd,
   isPressHold,
@@ -57,6 +59,7 @@ export function InsightCard({
   isDeleting,
 }: InsightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isSnoozing, setIsSnoozing] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const getBadgeVariant = (badge: string) => {
@@ -97,6 +100,16 @@ export function InsightCard({
     }
   }
 
+  const handleSnoozeAction = () => {
+    setIsSnoozing(true)
+    
+    // Add a delay to show the animation before moving the card
+    setTimeout(() => {
+      onSnooze(insight.id)
+      setIsSnoozing(false)
+    }, 600)
+  }
+
   return (
     <div className="h-full flex items-center justify-center p-4">
       <div
@@ -104,14 +117,19 @@ export function InsightCard({
         className={cn(
           "w-full max-w-md bg-card rounded-3xl border border-border shadow-2xl overflow-hidden transition-all select-none",
           isPressHold && "ring-2 ring-destructive",
+          isSnoozing && "ring-2 ring-blue-500"
         )}
         style={{ 
           userSelect: 'none', 
           touchAction: 'none',
-          transform: `scale(${1 - holdProgress * 0.5})`,
-          opacity: 1 - holdProgress * 0.7,
-          transition: isPressHold ? 'none' : 'all 300ms ease-out',
-          pointerEvents: isDeleting ? 'none' : 'auto'
+          transform: isSnoozing 
+            ? `scale(0.95) translateY(-20px)` 
+            : `scale(${1 - holdProgress * 0.5})`,
+          opacity: isSnoozing 
+            ? 0.7 
+            : 1 - holdProgress * 0.7,
+          transition: isPressHold || isSnoozing ? 'none' : 'all 300ms ease-out',
+          pointerEvents: isDeleting || isSnoozing ? 'none' : 'auto'
         }}
       >
         {/* AI Header with badges and bullets */}
@@ -207,9 +225,15 @@ export function InsightCard({
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                <Clock className="w-4 h-4 mr-2" />
-                Snooze
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1 bg-transparent hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all duration-300"
+                onClick={handleSnoozeAction}
+                disabled={isSnoozing}
+              >
+                <Clock className={cn("w-4 h-4 mr-2", isSnoozing && "animate-spin")} />
+                {isSnoozing ? "Snoozing..." : "Snooze"}
               </Button>
             </div>
           </div>

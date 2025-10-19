@@ -165,6 +165,26 @@ export function FeedView() {
     })
   }
 
+  const handleSnooze = (id: string) => {
+    console.log("[v0] Snooze action for insight:", id)
+    
+    // Move card to the end of the list
+    setVisibleCards(prev => {
+      const cardToSnooze = prev.find(card => card.id === id)
+      if (!cardToSnooze) return prev
+      
+      const otherCards = prev.filter(card => card.id !== id)
+      const newCards = [...otherCards, cardToSnooze]
+      
+      // Adjust current index if we're snoozing the current card
+      if (currentIndex >= otherCards.length) {
+        setCurrentIndex(Math.max(0, otherCards.length - 1))
+      }
+      
+      return newCards
+    })
+  }
+
   const startHoldAnimation = () => {
     console.log("Starting hold animation")
     const startTime = Date.now()
@@ -422,6 +442,7 @@ export function FeedView() {
                 onNext={handleNext}
                 onPrevious={handlePrevious}
                 onBlackhole={handleBlackhole}
+                onSnooze={handleSnooze}
                 onDragStart={() => setIsDragging(true)}
                 onDragEnd={() => setIsDragging(false)}
                 isPressHold={isPressHold}
