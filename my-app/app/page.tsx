@@ -8,11 +8,12 @@ import Dashboard from "@/components/dashboard"
 import { ConstellationGraph } from "@/components/constellation-graph"
 import { TransactionsView } from "@/components/transactions-view"
 import { GoalsView } from "@/components/goals-view"
+import { ChatView } from "@/components/chat-view"
 import { ProfileView } from "@/components/profile-view"
 import { ProtectedRoute } from "@/components/protected-route"
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"feed" | "constellations" | "transactions" | "goals" | "profile">("feed")
+  const [activeTab, setActiveTab] = useState<"feed" | "constellations" | "transactions" | "goals" | "chat" | "profile">("feed")
 
   return (
     <ProtectedRoute>
@@ -27,6 +28,7 @@ export default function Home() {
             {activeTab === "constellations" && <ConstellationGraph />}
             {activeTab === "transactions" && <TransactionsView />}
             {activeTab === "goals" && <GoalsView />}
+            {activeTab === "chat" && <ChatView />}
             {activeTab === "profile" && <ProfileView />}
           </main>
 

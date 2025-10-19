@@ -1,12 +1,12 @@
 "use client"
 
-import { Sparkles, Map, List, Target, User } from "lucide-react"
+import { Sparkles, Map, List, Target, User, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/app/store"
 
 interface BottomNavProps {
-  activeTab: "feed" | "constellations" | "transactions" | "goals" | "profile"
-  onTabChange: (tab: "feed" | "constellations" | "transactions" | "goals" | "profile") => void
+  activeTab: "feed" | "constellations" | "transactions" | "goals" | "chat" | "profile"
+  onTabChange: (tab: "feed" | "constellations" | "transactions" | "goals" | "chat" | "profile") => void
 }
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
@@ -15,6 +15,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     { key: "constellations" as const, icon: Map, label: "Map" },
     { key: "transactions" as const, icon: List, label: "Activity" },
     { key: "goals" as const, icon: Target, label: "Goals" },
+    { key: "chat" as const, icon: MessageSquare, label: "Chat" },
     { key: "profile" as const, icon: User, label: "You" },
   ]
 
