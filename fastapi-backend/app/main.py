@@ -102,7 +102,6 @@ CONSTRAINTS
 
 Transactions:
 {json.dumps(DATA.get('transactions', []), ensure_ascii=False, indent=2)}
-<<<<<<< Updated upstream
 
 """
                     }
@@ -194,8 +193,6 @@ Return JSON array only.
 
 Transactions:
 {json.dumps(request.transactions, ensure_ascii=False, indent=2)}
-=======
->>>>>>> Stashed changes
 
 """
                     }
