@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { useSession } from 'next-auth/react';
 import { InsightCard } from '@/components/insight-card';
 import { BlackholeZone } from '@/components/blackhole-zone';
+import { useStore } from '@/app/store';
 
 // Define the Insight type directly here
 type Insight = {
@@ -275,11 +276,13 @@ function NoInsightsFound({ onRetry }: { onRetry: () => void }) {
 
 export default function Dashboard() {
   const { data: session } = useSession();
-  const [insights, setInsights] = useState<Insight[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { insights: cachedInsights, setInsights, isDataLoading, setIsDataLoading } = useStore();
+  const [insights, setLocalInsights] = useState<Insight[] | null>(cachedInsights);
+  const [loading, setLoading] = useState(cachedInsights === null);
 
   const fetchAIResults = async () => {
     setLoading(true);
+    setIsDataLoading(true);
     try {
       const res = await fetch('/api/ai-process', {
         method: 'POST',
@@ -289,9 +292,11 @@ export default function Dashboard() {
 
       const data = await res.json();
       if (data.success && Array.isArray(data.result)) {
-        setInsights(data.result);
+        setLocalInsights(data.result);
+        setInsights(data.result); // Cache in store
       } else {
         console.error(data.error);
+        setLocalInsights([]);
         setInsights([]);
       }
         const res2 = await fetch('http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b', {
@@ -302,16 +307,25 @@ export default function Dashboard() {
         console.log("Nessie Purchases:", data2);
     } catch (err) {
       console.error(err);
+      setLocalInsights([]);
       setInsights([]);
     } finally {
       setLoading(false);
+      setIsDataLoading(false);
     }
   };
 
   useEffect(() => {
     if (!session) return;
-    fetchAIResults();
-  }, [session]);
+    
+    // Only fetch if we don't have cached data
+    if (cachedInsights === null) {
+      fetchAIResults();
+    } else {
+      setLocalInsights(cachedInsights);
+      setLoading(false);
+    }
+  }, [session, cachedInsights]);
 
   if (loading) return <CelestialLoadingScreen />;
   if (!insights || insights.length === 0) return <NoInsightsFound onRetry={fetchAIResults} />;

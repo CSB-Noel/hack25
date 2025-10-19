@@ -8,6 +8,7 @@ import { normalizeAnalyzeResponse } from "../lib/analysis"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, DollarSign } from "lucide-react"
+import { useStore } from "@/app/store"
 
 interface MerchantNode {
   id: string
@@ -72,6 +73,9 @@ export function ConstellationGraph() {
   const nodesRef = useRef<any[]>([])
   const categoriesRef = useRef<any[]>([])
   const spanningEdgesRef = useRef<Array<[string, string]>>([])
+  
+  // Use shared store for data caching
+  const { analyzedData, setAnalyzedData, isDataLoading } = useStore()
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -446,7 +450,146 @@ export function ConstellationGraph() {
   // Fetch classifications once on mount. Show loading until populated.
   useEffect(() => {
     let cancelled = false
+    
+    // Helper function to process and build nodes from classified data
+    const buildNodesFromData = (classifiedArray: ClassifiedItem[]) => {
+      // Build category nodes - aggregate ALL transactions by category
+      const categoriesMap = new Map<string, any>()
+      classifiedArray.forEach((c) => {
+        const catKey = c.category || 'Unknown'
+        if (!categoriesMap.has(catKey)) {
+          categoriesMap.set(catKey, {
+            id: `cat-${categoriesMap.size}`,
+            name: catKey,
+            type: 'category',
+            connections: [],
+            spendVolume: 0,
+            recency: 0,
+            priority: 0,
+            transactionCount: 0,
+          })
+        }
+        const node = categoriesMap.get(catKey)
+        node.spendVolume += c.amount || 0
+        node.transactionCount += 1
+        
+        // Update recency to most recent transaction
+        try {
+          const ts = new Date(c.purchase_date).getTime()
+          node.recency = Math.max(node.recency || 0, ts / Date.now())
+        } catch (e) {}
+        
+        // Update priority
+        node.priority = Math.max(node.priority || 0, c.confidence || 0)
+      })
+
+      const categoryEntries = Array.from(categoriesMap.values())
+      const catCnt = categoryEntries.length
+      const cols = Math.ceil(Math.sqrt(Math.max(1, catCnt)))
+      const rows = Math.ceil(catCnt / cols)
+      // Increase spacing to spread category nodes across the canvas
+      const spacingX = 75 / Math.max(1, cols - 1)
+      const spacingY = 75 / Math.max(1, rows - 1)
+      
+      // Randomize positions and resolve overlaps
+      const assignedPositions: Array<{x: number, y: number}> = []
+      const minDist = 24 // minimum pixel distance between nodes
+      const maxTries = 100
+      const cats = categoryEntries.map((cat: any, i: number) => {
+        let tries = 0
+        let px, py, baseX, baseY
+        do {
+          const col = i % cols
+          const row = Math.floor(i / cols)
+          const jitterX = (Math.random() - 0.5) * 18
+          const jitterY = (Math.random() - 0.5) * 18
+          baseX = 12 + col * spacingX + jitterX
+          baseY = 12 + row * spacingY + jitterY
+          px = Math.max(8, Math.min(92, baseX))
+          py = Math.max(8, Math.min(92, baseY))
+          // Check for overlap with previous nodes
+          let overlap = false
+          for (const pos of assignedPositions) {
+            if (Math.hypot(pos.x - px, pos.y - py) < minDist) {
+              overlap = true
+              break
+            }
+          }
+          if (!overlap) break
+          tries++
+        } while (tries < maxTries)
+        assignedPositions.push({x: px, y: py})
+        const sanitizedPriority = Math.max(0, Math.min(1, (cat.priority ?? 0.5)))
+        const sanitizedRecency = Math.max(0, Math.min(1, (cat.recency ?? 0.5)))
+        const sanitizedSpend = Math.max(0, (cat.spendVolume ?? 0))
+        return {
+          ...cat,
+          x: baseX,
+          y: baseY,
+          px,
+          py,
+          spendVolume: sanitizedSpend,
+          recency: sanitizedRecency,
+          priority: sanitizedPriority,
+          phase: Math.random() * Math.PI * 2,
+          ampX: 2 + Math.random() * 3,
+          ampY: 2 + Math.random() * 3,
+        }
+      })
+
+      // Create proximity-based connections between category nodes
+      const connectionsPerNode = new Map<string, Set<string>>()
+      
+      cats.forEach(node => {
+        // Calculate distances to all other category nodes
+        const distances: Array<{ id: string, dist: number }> = []
+        cats.forEach(other => {
+          if (node.id === other.id) return
+          const dx = (node.px || node.x) - (other.px || other.x)
+          const dy = (node.py || node.y) - (other.py || other.y)
+          const dist = Math.hypot(dx, dy)
+          distances.push({ id: other.id, dist })
+        })
+        
+        // Sort by distance and connect to 2-4 nearest neighbors
+        distances.sort((a, b) => a.dist - b.dist)
+        const numConnections = Math.min(2 + Math.floor(Math.random() * 3), distances.length)
+        
+        if (!connectionsPerNode.has(node.id)) {
+          connectionsPerNode.set(node.id, new Set())
+        }
+        
+        for (let i = 0; i < numConnections; i++) {
+          const targetId = distances[i].id
+          // Add bidirectional connection
+          connectionsPerNode.get(node.id)!.add(targetId)
+          if (!connectionsPerNode.has(targetId)) {
+            connectionsPerNode.set(targetId, new Set())
+          }
+          connectionsPerNode.get(targetId)!.add(node.id)
+        }
+      })
+      
+      // Update category node connections from proximity algorithm
+      cats.forEach(c => {
+        const newConnections = Array.from(connectionsPerNode.get(c.id) || [])
+        c.connections = newConnections
+      })
+
+      // write to refs used by animation - now only category nodes, no merchant nodes
+      nodesRef.current = cats
+      categoriesRef.current = []
+    }
+    
     const doFetch = async () => {
+      // Check if we have cached data
+      if (analyzedData) {
+        console.log('[ConstellationGraph] Using cached data')
+        buildNodesFromData(analyzedData)
+        setIsLoading(false)
+        return
+      }
+      
       setIsLoading(true)
       try {
         // console.log('[ConstellationGraph] starting /api/analyze fetch')
@@ -458,32 +601,18 @@ export function ConstellationGraph() {
         })
         if (!res.ok) throw new Error(`status ${res.status}`)
         const data = await res.json()
-        // console.log('[ConstellationGraph] /api/analyze returned (first level keys):', data && typeof data === 'object' ? Object.keys(data) : typeof data)
-        // debug: log debug.rawText if present
-        if (data && data.debug) {
-          try {
-            // console.log('[ConstellationGraph] debug.rawText (truncated):', (data.debug.rawText || '').toString().slice(0,2000))
-          } catch (e) {}
-          try {
-            // console.log('[ConstellationGraph] debug.parsed keys:', data.debug.parsed ? Object.keys(data.debug.parsed) : null)
-          } catch (e) {}
-        }
 
         // Try normalization from several plausible places
         let normalized = normalizeAnalyzeResponse(data?.classified || data)
-        // console.log('[ConstellationGraph] normalized.classified length (initial):', Array.isArray(normalized.classified) ? normalized.classified.length : 'not-array')
 
         // fallback: if normalized empty, try debug.parsed
         if ((!normalized.classified || normalized.classified.length === 0) && data?.debug?.parsed) {
-          // console.log('[ConstellationGraph] fallback: normalizing data.debug.parsed')
           normalized = normalizeAnalyzeResponse(data.debug.parsed)
-          // console.log('[ConstellationGraph] normalized.classified length (from debug.parsed):', normalized.classified.length)
         }
 
         // fallback: try parsing debug.rawText as JSON (strip fences) on client side
         if ((!normalized.classified || normalized.classified.length === 0) && data?.debug?.rawText) {
           try {
-            // naive attempt: look for first { or [ and parse substring
             const txt = (data.debug.rawText || '').toString()
             const firstBrace = txt.indexOf('{')
             const lastBrace = txt.lastIndexOf('}')
@@ -496,147 +625,19 @@ export function ConstellationGraph() {
               try {
                 const parsedAgain = JSON.parse(candidate)
                 const normalized2 = normalizeAnalyzeResponse(parsedAgain)
-                // console.log('[ConstellationGraph] normalized.classified length (from debug.rawText):', normalized2.classified.length)
                 if (normalized2.classified && normalized2.classified.length > 0) normalized = normalized2
-              } catch (e) { 
-                // console.log('[ConstellationGraph] client-side rawText parse failed') 
-                }
+              } catch (e) {}
             }
-          } catch (e) { 
-            // console.log('[ConstellationGraph] client-side debug.rawText fallback failed') 
-          }
+          } catch (e) {}
         }
         const classifiedArray: ClassifiedItem[] = normalized.classified || []
-
-        // Build category nodes - aggregate ALL transactions by category
-        const categoriesMap = new Map<string, any>()
-        classifiedArray.forEach((c) => {
-          const catKey = c.category || 'Unknown'
-          if (!categoriesMap.has(catKey)) {
-            categoriesMap.set(catKey, {
-              id: `cat-${categoriesMap.size}`,
-              name: catKey,
-              type: 'category',
-              connections: [],
-              spendVolume: 0,
-              recency: 0,
-              priority: 0,
-              transactionCount: 0,
-            })
-          }
-          const node = categoriesMap.get(catKey)
-          node.spendVolume += c.amount || 0
-          node.transactionCount += 1
-          
-          // Update recency to most recent transaction
-          try {
-            const ts = new Date(c.purchase_date).getTime()
-            node.recency = Math.max(node.recency || 0, ts / Date.now())
-          } catch (e) {}
-          
-          // Update priority
-          node.priority = Math.max(node.priority || 0, c.confidence || 0)
-        })
-
-        const categoryEntries = Array.from(categoriesMap.values())
-        const catCnt = categoryEntries.length
-        const cols = Math.ceil(Math.sqrt(Math.max(1, catCnt)))
-        const rows = Math.ceil(catCnt / cols)
-        // Increase spacing to spread category nodes across the canvas
-        const spacingX = 75 / Math.max(1, cols - 1)
-        const spacingY = 75 / Math.max(1, rows - 1)
         
-        // Randomize positions and resolve overlaps
-        const assignedPositions: Array<{x: number, y: number}> = []
-        const minDist = 24 // minimum pixel distance between nodes
-        const maxTries = 100
-        const cats = categoryEntries.map((cat: any, i: number) => {
-          let tries = 0
-          let px, py, baseX, baseY
-          do {
-            const col = i % cols
-            const row = Math.floor(i / cols)
-            const jitterX = (Math.random() - 0.5) * 18
-            const jitterY = (Math.random() - 0.5) * 18
-            baseX = 12 + col * spacingX + jitterX
-            baseY = 12 + row * spacingY + jitterY
-            px = Math.max(8, Math.min(92, baseX))
-            py = Math.max(8, Math.min(92, baseY))
-            // Check for overlap with previous nodes
-            let overlap = false
-            for (const pos of assignedPositions) {
-              if (Math.hypot(pos.x - px, pos.y - py) < minDist) {
-                overlap = true
-                break
-              }
-            }
-            if (!overlap) break
-            tries++
-          } while (tries < maxTries)
-          assignedPositions.push({x: px, y: py})
-          const sanitizedPriority = Math.max(0, Math.min(1, (cat.priority ?? 0.5)))
-          const sanitizedRecency = Math.max(0, Math.min(1, (cat.recency ?? 0.5)))
-          const sanitizedSpend = Math.max(0, (cat.spendVolume ?? 0))
-          return {
-            ...cat,
-            x: baseX,
-            y: baseY,
-            px,
-            py,
-            spendVolume: sanitizedSpend,
-            recency: sanitizedRecency,
-            priority: sanitizedPriority,
-            phase: Math.random() * Math.PI * 2,
-            ampX: 2 + Math.random() * 3,
-            ampY: 2 + Math.random() * 3,
-          }
-        })
+        // Cache the data in the store
+        setAnalyzedData(classifiedArray)
 
-  if (cancelled) return
-  // console.log('[ConstellationGraph] built', cats.length, 'category nodes (aggregated)')
-
-        // Create proximity-based connections between category nodes
-        const connectionsPerNode = new Map<string, Set<string>>()
+        if (cancelled) return
         
-        cats.forEach(node => {
-          // Calculate distances to all other category nodes
-          const distances: Array<{ id: string, dist: number }> = []
-          cats.forEach(other => {
-            if (node.id === other.id) return
-            const dx = (node.px || node.x) - (other.px || other.x)
-            const dy = (node.py || node.y) - (other.py || other.y)
-            const dist = Math.hypot(dx, dy)
-            distances.push({ id: other.id, dist })
-          })
-          
-          // Sort by distance and connect to 2-4 nearest neighbors
-          distances.sort((a, b) => a.dist - b.dist)
-          const numConnections = Math.min(2 + Math.floor(Math.random() * 3), distances.length)
-          
-          if (!connectionsPerNode.has(node.id)) {
-            connectionsPerNode.set(node.id, new Set())
-          }
-          
-          for (let i = 0; i < numConnections; i++) {
-            const targetId = distances[i].id
-            // Add bidirectional connection
-            connectionsPerNode.get(node.id)!.add(targetId)
-            if (!connectionsPerNode.has(targetId)) {
-              connectionsPerNode.set(targetId, new Set())
-            }
-            connectionsPerNode.get(targetId)!.add(node.id)
-          }
-        })
-        
-        // Update category node connections from proximity algorithm
-        cats.forEach(c => {
-          const newConnections = Array.from(connectionsPerNode.get(c.id) || [])
-          c.connections = newConnections
-        })
-
-        // write to refs used by animation - now only category nodes, no merchant nodes
-  nodesRef.current = cats
-  categoriesRef.current = []
+        buildNodesFromData(classifiedArray)
 
         setIsLoading(false)
         // console.log('[ConstellationGraph] setIsLoading(false)')
@@ -648,7 +649,7 @@ export function ConstellationGraph() {
 
     doFetch()
     return () => { cancelled = true }
-  }, [])
+  }, [analyzedData, setAnalyzedData])
 
 
 // small helper to brighten a hex color by fraction (0-1)
