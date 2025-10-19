@@ -4,6 +4,17 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import { GmailService } from "@/lib/gmail-service";
 import { OutlookService } from "@/lib/outlook-service";
 
+type CachedData = {
+  timestamp: number;
+  result: any;
+};
+
+// In-memory cache
+const cache: Record<string, CachedData> = {};
+
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+
 export async function POST(request: NextRequest) {
   try {
     const { provider, maxResults = 20 } = await request.json();
@@ -11,6 +22,13 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.accessToken || !provider) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const cacheKey = `${session.user?.email}-${provider}`;
+
+    const cached = cache[cacheKey];
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return NextResponse.json({ success: true, result: cached.result });
     }
 
     // 1️⃣ Fetch emails
@@ -134,6 +152,12 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
     }
 
     const summary = aiData.choices?.[0]?.message?.content || "[]";
+
+    cache[cacheKey] = {
+      timestamp: Date.now(),
+      result: summary,
+    };
+
     // 3️⃣ Return summary (or store in DB)
     let summaryJson;
     try {
