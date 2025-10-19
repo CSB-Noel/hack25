@@ -98,7 +98,7 @@ export function ProfileView() {
           </Card>
         </div> */}
 
-        <div>
+        {/* <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Connections</h3>
           <Card className="bg-card border-border divide-y divide-border">
             <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
@@ -123,7 +123,7 @@ export function ProfileView() {
               </div>
             </button>
           </Card>
-        </div>
+        </div> */}
 
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Support</h3>
