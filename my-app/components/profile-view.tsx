@@ -3,9 +3,12 @@
 import { Settings, Bell, Moon, Zap, HelpCircle, LogOut, User, Mail, Shield, DollarSign } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useSession, signOut } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 
 export function ProfileView() {
+  const { data: session } = useSession()
+
   return (
     <>
     <div className="px-4 max-w-md mx-auto pb-8">
@@ -13,14 +16,16 @@ export function ProfileView() {
         <h2 className="text-xl font-semibold text-foreground mb-4">Profile</h2>
 
         {/* User Info Card */}
+        {session?.user && (
+        <>
         <Card className="p-4 bg-card border-border mb-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
               <User className="w-8 h-8 text-primary" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-foreground">Alex Morgan</h3>
-              <p className="text-sm text-muted-foreground">alex.morgan@email.com</p>
+              <h3 className="font-semibold text-foreground">{session.user.name || "User"}</h3>
+              <p className="text-sm text-muted-foreground">{session.user.email}</p>
             </div>
             <Button variant="ghost" size="icon">
               <Settings className="w-5 h-5" />
@@ -41,6 +46,8 @@ export function ProfileView() {
             <p className="text-xs text-muted-foreground">Goals</p>
           </Card>
         </div>
+        </>
+      )}
       </div>
 
       {/* Settings Sections */}
@@ -91,7 +98,7 @@ export function ProfileView() {
           </Card>
         </div> */}
 
-        {/* <div>
+        <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Connections</h3>
           <Card className="bg-card border-border divide-y divide-border">
             <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
@@ -116,7 +123,7 @@ export function ProfileView() {
               </div>
             </button>
           </Card>
-        </div> */}
+        </div>
 
         <div>
           <h3 className="text-sm font-semibold text-muted-foreground mb-3">Support</h3>

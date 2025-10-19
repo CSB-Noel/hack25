@@ -1,8 +1,22 @@
 "use client"
 
+import { Sparkles, LogOut, User } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { useSession, signOut } from "next-auth/react"
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import StarCrescentSolid from "./ui/star"
 
 export function MobileHeader() {
+  const { data: session } = useSession()
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/" })
+    setIsLogoutDialogOpen(false)
+  }
+
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
@@ -10,13 +24,13 @@ export function MobileHeader() {
           <h1 className="text-lg title-font font-semibold">StellarFinance</h1>
           <StarCrescentSolid size="20" />
         </div>
-{/* 
+
         <div className="flex-1">
           <Input placeholder="Search transactions…" className="bg-card border-border text-sm h-10" />
-        </div> */}
+        </div>
 
         {/* User menu */}
-        {/* {session?.user && (
+        {session?.user && (
           <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
@@ -48,7 +62,7 @@ export function MobileHeader() {
               </div>
             </DialogContent>
           </Dialog>
-        )} */}
+        )}
       </div>
     </header>
   )

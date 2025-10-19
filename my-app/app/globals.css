@@ -70,11 +70,6 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
-.title-font {
-  font-family: 'Inconsolata', monospace;
-  font-weight: 800;
-}
-
 @theme inline {
   --font-sans: "Inter", "Geist", "Geist Fallback";
   --font-mono: "JetBrains Mono", "Geist Mono", "Geist Mono Fallback";

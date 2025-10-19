@@ -1,10 +1,11 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Mulish } from "next/font/google"
+import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Providers } from "@/components/providers/session-provider"
 import "./globals.css"
 
-const mulish = Mulish({ subsets: ["latin"], weight: ["200", "300", "400", "600", "700", "800", "900"] })
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "StellarMail",
@@ -19,8 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${mulish.className} font-sans antialiased`}>
-        {children}
+      <body className={`${inter.className} font-sans antialiased`}>
+        <Providers>
+          {children}
+        </Providers>
         <Analytics />
       </body>
     </html>
