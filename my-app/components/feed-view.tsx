@@ -6,111 +6,129 @@ import { BlackholeZone } from "@/components/blackhole-zone"
 
 
 
-const sampleInsights: any = [];
+interface Insight {
+  id: string;
+  kind: "subscription" | "bill" | "anomaly" | "goal" | "advice";
+  title: string;
+  merchantOrBill: string;
+  amount: number;
+  date: string;
+  account: string;
+  category: string;
+  delta30: number;
+  delta90: number;
+  aiHeader: {
+    bullets: string[];
+    nextStep: string;
+    badges: string[];
+    confidence: number;
+  };
+}
+
 
 
 
 // Sample financial insights data
-// const sampleInsights = [
-//   {
-//     id: "1",
-//     kind: "subscription" as const,
-//     title: "Spotify price increased",
-//     merchantOrBill: "Spotify",
-//     amount: 10.99,
-//     date: "2025-10-01T10:22:00Z",
-//     account: "Capital One Savor",
-//     category: "Entertainment",
-//     delta30: 1.0,
-//     delta90: 1.0,
-//     aiHeader: {
-//       bullets: [
-//         "Price up $1.00 vs last month",
-//         "Duplicate service: also paying Apple Music",
-//         "Low usage in past 60 days",
-//       ],
-//       nextStep: "Keep Spotify, cancel Apple Music?",
-//       badges: ["priority", "priceUp", "duplicateSub"],
-//       confidence: 0.91,
-//     },
-//   },
-//   {
-//     id: "2",
-//     kind: "bill" as const,
-//     title: "Electric bill due soon",
-//     merchantOrBill: "Pacific Gas & Electric",
-//     amount: 142.5,
-//     date: "2025-10-15T00:00:00Z",
-//     account: "Chase Checking",
-//     category: "Utilities",
-//     delta30: 12.5,
-//     delta90: -5.2,
-//     aiHeader: {
-//       bullets: ["Due in 3 days", "Up 9.6% from last month", "Balance sufficient to pay"],
-//       nextStep: "Schedule payment now?",
-//       badges: ["dueSoon"],
-//       confidence: 0.95,
-//     },
-//   },
-//   {
-//     id: "3",
-//     kind: "anomaly" as const,
-//     title: "Unusual spending detected",
-//     merchantOrBill: "Amazon",
-//     amount: 287.43,
-//     date: "2025-10-12T14:30:00Z",
-//     account: "Capital One Savor",
-//     category: "Shopping",
-//     delta30: 150.0,
-//     delta90: 200.0,
-//     aiHeader: {
-//       bullets: ["3x your typical Amazon spend", "Multiple charges in one day", "Consider setting a monthly cap"],
-//       nextStep: "Review charges or set budget alert?",
-//       badges: ["anomaly"],
-//       confidence: 0.88,
-//     },
-//   },
-//   {
-//     id: "4",
-//     kind: "goal" as const,
-//     title: "Emergency fund progress",
-//     merchantOrBill: "Savings Goal",
-//     amount: 3250.0,
-//     date: "2025-10-18T00:00:00Z",
-//     account: "High-Yield Savings",
-//     category: "Savings",
-//     delta30: 500.0,
-//     delta90: 1250.0,
-//     aiHeader: {
-//       bullets: ["65% to your $5,000 target", "On track to reach goal in 4 months", "Found $150 excess in checking"],
-//       nextStep: "Sweep excess to savings?",
-//       badges: [],
-//       confidence: 0.92,
-//     },
-//   },
-//   {
-//     id: "5",
-//     kind: "advice" as const,
-//     title: "Subscription optimization",
-//     merchantOrBill: "Multiple Services",
-//     amount: 89.97,
-//     date: "2025-10-18T00:00:00Z",
-//     account: "Multiple Accounts",
-//     category: "Subscriptions",
-//     delta30: 0,
-//     delta90: 0,
-//     aiHeader: {
-//       bullets: [
-//         "Paying for 3 streaming services",
-//         "Could save $30/mo with family plan",
-//         "Netflix, Hulu, Disney+ detected",
-//       ],
-//       nextStep: "Switch to bundle plan?",
-//       badges: ["priority"],
-//       confidence: 0.87,
-//     },
-//   },
-// ]
+const sampleInsights = [
+  {
+    id: "1",
+    kind: "subscription" as const,
+    title: "Spotify price increased",
+    merchantOrBill: "Spotify",
+    amount: 10.99,
+    date: "2025-10-01T10:22:00Z",
+    account: "Capital One Savor",
+    category: "Entertainment",
+    delta30: 1.0,
+    delta90: 1.0,
+    aiHeader: {
+      bullets: [
+        "Price up $1.00 vs last month",
+        "Duplicate service: also paying Apple Music",
+        "Low usage in past 60 days",
+      ],
+      nextStep: "Keep Spotify, cancel Apple Music?",
+      badges: ["priority", "priceUp", "duplicateSub"],
+      confidence: 0.91,
+    },
+  },
+  {
+    id: "2",
+    kind: "bill" as const,
+    title: "Electric bill due soon",
+    merchantOrBill: "Pacific Gas & Electric",
+    amount: 142.5,
+    date: "2025-10-15T00:00:00Z",
+    account: "Chase Checking",
+    category: "Utilities",
+    delta30: 12.5,
+    delta90: -5.2,
+    aiHeader: {
+      bullets: ["Due in 3 days", "Up 9.6% from last month", "Balance sufficient to pay"],
+      nextStep: "Schedule payment now?",
+      badges: ["dueSoon"],
+      confidence: 0.95,
+    },
+  },
+  {
+    id: "3",
+    kind: "anomaly" as const,
+    title: "Unusual spending detected",
+    merchantOrBill: "Amazon",
+    amount: 287.43,
+    date: "2025-10-12T14:30:00Z",
+    account: "Capital One Savor",
+    category: "Shopping",
+    delta30: 150.0,
+    delta90: 200.0,
+    aiHeader: {
+      bullets: ["3x your typical Amazon spend", "Multiple charges in one day", "Consider setting a monthly cap"],
+      nextStep: "Review charges or set budget alert?",
+      badges: ["anomaly"],
+      confidence: 0.88,
+    },
+  },
+  {
+    id: "4",
+    kind: "goal" as const,
+    title: "Emergency fund progress",
+    merchantOrBill: "Savings Goal",
+    amount: 3250.0,
+    date: "2025-10-18T00:00:00Z",
+    account: "High-Yield Savings",
+    category: "Savings",
+    delta30: 500.0,
+    delta90: 1250.0,
+    aiHeader: {
+      bullets: ["65% to your $5,000 target", "On track to reach goal in 4 months", "Found $150 excess in checking"],
+      nextStep: "Sweep excess to savings?",
+      badges: [],
+      confidence: 0.92,
+    },
+  },
+  {
+    id: "5",
+    kind: "advice" as const,
+    title: "Subscription optimization",
+    merchantOrBill: "Multiple Services",
+    amount: 89.97,
+    date: "2025-10-18T00:00:00Z",
+    account: "Multiple Accounts",
+    category: "Subscriptions",
+    delta30: 0,
+    delta90: 0,
+    aiHeader: {
+      bullets: [
+        "Paying for 3 streaming services",
+        "Could save $30/mo with family plan",
+        "Netflix, Hulu, Disney+ detected",
+      ],
+      nextStep: "Switch to bundle plan?",
+      badges: ["priority"],
+      confidence: 0.87,
+    },
+  },
+]
 
 export function FeedView() {
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -150,18 +168,77 @@ export function FeedView() {
   useEffect(() => {
     const fetchInsights = async () => {
       try {
-        const response = await fetch("http://localhost:8000/emails");
+        const response = await fetch("http://localhost:5000/emails");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setVisibleCards(data);
+        console.log("Fetched insights:", data);
+        // Normalize incoming email objects to the Insight interface expected by InsightCard
+        const normalize = (item: any, idx: number) => {
+          // If item already looks like an Insight, try to keep it
+          if (item && item.id && item.aiHeader && Array.isArray(item.aiHeader.bullets)) return item
+
+          // Map common email properties to insight fields with safe defaults
+          const id = item.id ?? item.messageId ?? `email-${Date.now()}-${idx}`
+          const subject = item.subject ?? item.title ?? "(no subject)"
+          const from = item.from?.name ?? item.from?.email ?? item.sender ?? "Unknown sender"
+          const amount = typeof item.amount === 'number' ? item.amount : 0
+          const date = item.date ?? item.receivedDate ?? new Date().toISOString()
+          const account = item.account ?? "Email"
+          const category = item.category ?? "Email"
+
+          const aiHeader = item.aiHeader ?? {
+            bullets: item.preview ? [String(item.preview).slice(0, 140)] : ["Preview not available"],
+            nextStep: item.recommendation ?? "Review",
+            badges: item.badges ?? [],
+            confidence: typeof item.confidence === 'number' ? item.confidence : 0.5,
+          }
+
+          return {
+            id,
+            kind: (item.kind as any) ?? "advice",
+            title: subject,
+            merchantOrBill: from,
+            amount,
+            date,
+            account,
+            category,
+            delta30: typeof item.delta30 === 'number' ? item.delta30 : 0,
+            delta90: typeof item.delta90 === 'number' ? item.delta90 : 0,
+            aiHeader,
+          }
+        }
+
+        // The server may return either an array or an object like { insights: [...] }
+        let insightsArray: any[] = []
+        if (Array.isArray(data)) {
+          insightsArray = data
+        } else if (data && Array.isArray(data.insights)) {
+          insightsArray = data.insights
+        } else if (data && typeof data.insights === 'string') {
+          try {
+            const parsed = JSON.parse(data.insights)
+            if (Array.isArray(parsed)) insightsArray = parsed
+          } catch (err) {
+            console.warn('Could not parse stringified insights', err)
+          }
+        }
+
+        if (insightsArray.length === 0) {
+          console.warn('Unexpected payload for /emails, expected array or { insights: [] }. Falling back to sampleInsights.', data)
+          setVisibleCards(sampleInsights)
+        } else {
+          const normalized = insightsArray.map(normalize)
+          console.log('Normalized insights:', normalized)
+          setVisibleCards(normalized)
+        }
       } catch (error) {
         console.error("Failed to fetch insights:", error);
       }
     };
-
     fetchInsights();
+    
   }, []);
 
   const handleNext = () => {
@@ -176,7 +253,7 @@ export function FeedView() {
     console.log("[v0] Blackhole action for insight:", id)
     
     // Remove card from visible cards
-    setVisibleCards(prev => {
+    setVisibleCards((prev: any[]) => {
       const newCards = prev.filter(card => card.id !== id)
       
       // Adjust current index if needed using the new length
@@ -418,7 +495,6 @@ export function FeedView() {
       resetHoldState()
     }
   }
-
   return (
     <div 
       className="relative h-[calc(100vh-8rem)] select-none"
@@ -437,7 +513,7 @@ export function FeedView() {
             transition: isTransitioning ? 'transform 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none'
           }}
         >
-          {visibleCards.map((insight, index) => (
+          {visibleCards.map((insight, index: number) => (
             <div key={insight.id} className="h-full snap-start">
               <InsightCard
                 insight={insight}

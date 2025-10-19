@@ -2,9 +2,11 @@ const { google } = require('googleapis');
 const fs = require('fs');
 const { JSDOM } = require('jsdom'); 
 const express = require('express');
+const cors = require('cors');
 
 const server = express();
 server.use(express.json());
+server.use(cors());
 
 let messagesWithDate = [];
 
