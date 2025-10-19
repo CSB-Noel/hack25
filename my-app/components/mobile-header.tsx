@@ -22,11 +22,11 @@ export function MobileHeader() {
       <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
         <div className="flex-1 flex items-center justify-center gap-2">
           <h1 className="text-lg title-font font-semibold">StellarFinance</h1>
-          <StarCrescentSolid size="20" />
+          <StarCrescentSolid size="24" />
         </div>
 
         <div className="flex-1">
-          <Input placeholder="Search transactions…" className="bg-card border-border text-sm h-10" />
+          <Input placeholder="" className="border-0" disabled/>
         </div>
 
         {/* User menu */}

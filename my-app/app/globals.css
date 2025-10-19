@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@200..900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -71,8 +70,8 @@
 }
 
 @theme inline {
-  --font-sans: "Inter", "Geist", "Geist Fallback";
-  --font-mono: "JetBrains Mono", "Geist Mono", "Geist Mono Fallback";
+  --font-sans: "Inconsolata", monospace;
+  --font-mono: "Inconsolata", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -117,7 +116,14 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Ensure fallback font-family uses the CSS variable */
+    font-family: var(--font-sans);
   }
+}
+
+/* Title font utility using Inconsolata */
+.title-font {
+  font-family: var(--font-sans);
 }
 
 /* Custom starfield animation */

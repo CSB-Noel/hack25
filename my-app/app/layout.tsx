@@ -1,11 +1,11 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inconsolata } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Providers } from "@/components/providers/session-provider"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const inconsolata = Inconsolata({ subsets: ["latin"], weight: ["200","300","400","500","600","700","800","900"] })
 
 export const metadata: Metadata = {
   title: "StellarMail",
@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} font-sans antialiased`}>
+  <body className={`${inconsolata.className} font-sans antialiased`}>
         <Providers>
           {children}
         </Providers>
