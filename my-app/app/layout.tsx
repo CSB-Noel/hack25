@@ -8,15 +8,9 @@ import "./globals.css"
 const inconsolata = Inconsolata({ subsets: ["latin"], weight: ["200","300","400","500","600","700","800","900"] })
 
 export const metadata: Metadata = {
-  title: "Orion",
-  description: "Navigate your finances like the cosmos",
-  authors: [
-    { name: "v0.pap" },
-    { name: "Priscilla Ye" },
-    { name: "Noel Varghese" },
-    { name: "Rohan Palivela" },
-    { name: "Aaron Shuang" },
-  ],
+  title: "StellarMail",
+  description: "Navigate your inbox like the cosmos",
+  generator: "v0.app",
 }
 
 export default function RootLayout({

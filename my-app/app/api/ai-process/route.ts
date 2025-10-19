@@ -3,8 +3,14 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { GmailService } from "@/lib/gmail-service";
 import { OutlookService } from "@/lib/outlook-service";
-import { supabase } from '@/lib/supabase';
 
+type CachedData = {
+  timestamp: number;
+  result: any;
+};
+
+// ✅ Top-level cache so it persists between requests
+const cache: Record<string, CachedData> = {};
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 export async function POST(request: NextRequest) {
@@ -16,29 +22,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userEmail = session.user?.email!;
-    const cacheKey = `${userEmail}-${provider}`;
+    const cacheKey = `${session.user?.email}-${provider}`;
+    const cached = cache[cacheKey];
 
     // ✅ Return cached result if still valid
-    const { data: cachedRows, error: cacheError } = await supabase
-      .from("email_cache")
-      .select("result, created_at")
-      .eq("user_email", userEmail)
-      .eq("provider", provider)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (cacheError) console.warn("Supabase cache lookup failed:", cacheError);
-    if (
-          cachedRows &&
-          Date.now() - new Date(cachedRows.created_at).getTime() < CACHE_DURATION
-        ) {
-          console.log("✅ Returning cached result from Supabase");
-          return NextResponse.json({ success: true, result: cachedRows.result });
-        }
-
-
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return NextResponse.json({ success: true, result: cached.result });
+    }
 
     // 1️⃣ Fetch emails
     let emailText = "";
@@ -176,19 +166,13 @@ TASKS:
       summaryJson = [];
     }
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("email_cache")
-      .insert({
-        user_email: userEmail,
-        provider,
-        result: summaryJson,
-      })
-      .select(); // returns inserted row
-
-    if (insertError) console.error("Insert error:", insertError);
-    else console.log("✅ Inserted into Supabase:", inserted);
+    cache[cacheKey] = {
+      timestamp: Date.now(),
+      result: summaryJson,
+    };
 
     return NextResponse.json({ success: true, result: summaryJson });
+
   } catch (error: any) {
     console.error("❌ /api/ai-process error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
