@@ -11,6 +11,10 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "sk-or-v1-dc9cc098ffd6
 class AnalyzeRequest(BaseModel):
     transactions: list
 
+class InsightRequest(BaseModel):
+    transactions: list
+
+
 #Analyze returns the category data. Used for the graph and the insights if necessary.
 @app.post("/analyze")
 def analyze(request: AnalyzeRequest):
@@ -114,4 +118,83 @@ Transactions:
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     
+@app.post("/fetch_insights")
+def fetch_insights(request: InsightRequest):
+    payload = {
+        "model": "google/gemini-2.5-flash",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a Senior Financial Data Analyst specializing in consumer behavior. Your task is to analyze the provided list of financial purchases. Your output MUST be a single, valid JSON array containing one object for each input purchase. You must preserve the original 'purchase_id' and add the following calculated fields."
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f""" 
+You are a Senior Financial Analyst. Given a list of Capital One–style transactions, output ONLY a valid JSON array (no text, no markdown) of 3–8 insight objects matching this schema:
 
+[
+  {{
+    "id": "string",
+    "kind": "subscription"|"bill"|"anomaly"|"goal"|"advice",
+    "title": "string",
+    "merchantOrBill": "string",
+    "amount": number,
+    "date": "YYYY-MM-DDTHH:MM:SSZ",
+    "account": "string",
+    "category": "string",
+    "delta30": number,
+    "delta90": number,
+    "aiHeader": {{
+      "bullets": ["string",...],
+      "nextStep": "string",
+      "badges": ["priority","priceUp","duplicateSub","dueSoon","anomaly"],
+      "confidence": number
+    }}
+  }}
+]
+
+Rules:
+- Use only provided transactions; ignore pending unless relevant.
+- Deltas = current − 30d/90d avg (fallback category → 0).
+- IDs: purchase_id or "ins::<kind>::<merchant_id>::<YYYY-MM>".
+- Round amounts to 2 decimals; ≤3 bullets/badges; confidence 0.75–0.98.
+- Use concise, user-facing titles.
+
+Detector hints:
+• subscription → recurring similar-amount monthly/weekly payments  
+• bill → utilities/telecom with monthly cadence (add “dueSoon” if <7 days)  
+• anomaly → ≥2.5× avg or multiple same-day charges  
+• goal → savings transfers or positive balance growth  
+• advice → multi-service overlap (e.g. streaming bundle)
+
+Return JSON array only.
+
+Transactions:
+{json.dumps(request.transactions, ensure_ascii=False, indent=2)}
+
+"""
+                    }
+                ]
+            }
+        ],
+        "temperature": 0.5,
+    }
+
+    response = requests.post(
+        url="https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        },
+        json=payload
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        message = data["choices"][0]["message"]["content"]
+        return {"result": message}
+    else:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+    
