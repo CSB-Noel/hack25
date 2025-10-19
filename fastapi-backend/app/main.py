@@ -8,6 +8,14 @@ app = FastAPI()
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "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")
 
+# Load sample transactions from data.json (used instead of request.transactions)
+DATA_FILE = os.path.join(os.path.dirname(__file__), 'data.json')
+try:
+    with open(DATA_FILE, 'r', encoding='utf-8') as f:
+        DATA = json.load(f)
+except Exception:
+    DATA = { 'transactions': [] }
+
 class AnalyzeRequest(BaseModel):
     transactions: list
 
@@ -93,7 +101,8 @@ CONSTRAINTS
 - Do not include insights or additional sections.
 
 Transactions:
-{json.dumps(request.transactions, ensure_ascii=False, indent=2)}
+{json.dumps(DATA.get('transactions', []), ensure_ascii=False, indent=2)}
+<<<<<<< Updated upstream
 
 """
                     }
@@ -102,6 +111,17 @@ Transactions:
         ],
         "temperature": 0.5,
     }
+
+    # prefer incoming request.transactions when provided, otherwise fall back to data.json
+    txs = request.transactions if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0 else DATA.get('transactions', [])
+    source = 'request' if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0 else 'data.json'
+    print(f"[analyze] sending {len(txs)} transactions from {source} to OpenRouter")
+
+    # inject the chosen transactions into the prompt payload
+    payload['messages'][1]['content'][0]['text'] = payload['messages'][1]['content'][0]['text'].replace(
+        json.dumps(DATA.get('transactions', []), ensure_ascii=False, indent=2),
+        json.dumps(txs, ensure_ascii=False, indent=2)
+    )
 
     response = requests.post(
         url="https://openrouter.ai/api/v1/chat/completions",
@@ -174,6 +194,8 @@ Return JSON array only.
 
 Transactions:
 {json.dumps(request.transactions, ensure_ascii=False, indent=2)}
+=======
+>>>>>>> Stashed changes
 
 """
                     }
@@ -182,6 +204,17 @@ Transactions:
         ],
         "temperature": 0.5,
     }
+
+    # prefer incoming request.transactions when provided, otherwise fall back to data.json
+    txs = request.transactions if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0 else DATA.get('transactions', [])
+    source = 'request' if getattr(request, 'transactions', None) and len(getattr(request, 'transactions', [])) > 0 else 'data.json'
+    print(f"[analyze] sending {len(txs)} transactions from {source} to OpenRouter")
+
+    # inject the chosen transactions into the prompt payload
+    payload['messages'][1]['content'][0]['text'] = payload['messages'][1]['content'][0]['text'].replace(
+        json.dumps(DATA.get('transactions', []), ensure_ascii=False, indent=2),
+        json.dumps(txs, ensure_ascii=False, indent=2)
+    )
 
     response = requests.post(
         url="https://openrouter.ai/api/v1/chat/completions",

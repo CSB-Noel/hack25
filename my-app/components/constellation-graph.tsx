@@ -3,6 +3,8 @@
 import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
+import type { RawTransaction, ClassifiedItem } from "../lib/analysis"
+import { normalizeAnalyzeResponse } from "../lib/analysis"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TrendingUp, TrendingDown, DollarSign } from "lucide-react"
@@ -20,84 +22,42 @@ interface MerchantNode {
 }
 
 const mockMerchants: MerchantNode[] = [
-  {
-    id: "1",
-    name: "Amazon",
-    type: "merchant",
-    x: 50,
-    y: 30,
-    connections: ["2", "3"],
-    spendVolume: 1250,
-    recency: 0.9,
-    priority: 0.8,
-  },
-  {
-    id: "2",
-    name: "Groceries",
-    type: "category",
-    x: 30,
-    y: 60,
-    connections: ["1", "4"],
-    spendVolume: 850,
-    recency: 0.95,
-    priority: 0.9,
-  },
-  {
-    id: "3",
-    name: "Spotify",
-    type: "subscription",
-    x: 70,
-    y: 50,
-    connections: ["1", "5"],
-    spendVolume: 120,
-    recency: 1.0,
-    priority: 0.7,
-  },
-  {
-    id: "4",
-    name: "Whole Foods",
-    type: "merchant",
-    x: 50,
-    y: 75,
-    connections: ["2"],
-    spendVolume: 450,
-    recency: 0.85,
-    priority: 0.6,
-  },
-  {
-    id: "5",
-    name: "Emergency Fund",
-    type: "goal",
-    x: 85,
-    y: 70,
-    connections: ["3"],
-    spendVolume: 3250,
-    recency: 0.8,
-    priority: 0.95,
-  },
-  {
-    id: "6",
-    name: "Netflix",
-    type: "subscription",
-    x: 65,
-    y: 25,
-    connections: ["3"],
-    spendVolume: 180,
-    recency: 1.0,
-    priority: 0.5,
-  },
-  {
-    id: "7",
-    name: "Utilities",
-    type: "category",
-    x: 20,
-    y: 40,
-    connections: ["2"],
-    spendVolume: 320,
-    recency: 0.7,
-    priority: 0.85,
-  },
 ]
+
+  // mapping table for friendly category labels (kept for future use)
+  const CATEGORY_LABEL_MAP: Record<string, string> = {
+    'Fixed::Housing': 'Housing',
+    'Fixed::Debt': 'Debt',
+    'Fixed::Subscriptions': 'Subscriptions',
+    "Variable::Groceries": 'Groceries',
+    'Variable::Dining/Takeout': 'Dining',
+    'Variable::Transportation': 'Transportation',
+    'Variable::Health&Personal': 'Health & Personal',
+    'Variable::Impulse&Wants': 'Impulse & Wants',
+    'Income::Salary': 'Salary',
+    'Transfer::P2P': 'P2P',
+  }
+  // color map for specific categories (enum keys)
+  const CATEGORY_COLOR_MAP: Record<string, string> = {
+    'Fixed::Housing': '#6ea8ff',
+    'Fixed::Debt': '#9fb3d1',
+    'Fixed::Subscriptions': '#ffd66e',
+    'Variable::Groceries': '#a3d39c',
+    'Variable::Dining/Takeout': '#ffb380',
+    'Variable::Transportation': '#9ad0ff',
+    'Variable::Health&Personal': '#f6a5c0',
+    'Variable::Impulse&Wants': '#d39bff',
+    'Income::Salary': '#7be3a8',
+    'Transfer::P2P': '#c9c9c9',
+  }
+
+  // fallback color by node type
+  const TYPE_COLOR_MAP: Record<string, string> = {
+    merchant: '#6ea8ff',
+    subscription: '#ffd66e',
+    category: '#9fb3d1',
+    goal: '#35e0b4',
+  }
 
 export function ConstellationGraph() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -106,6 +66,11 @@ export function ConstellationGraph() {
   const hoveredMerchantRef = useRef<string | null>(null)
   const hoverLabelRef = useRef<{ x: number; y: number; name: string } | null>(null)
   const [hoverLabel, setHoverLabel] = useState<{ x: number; y: number; name: string } | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  const nodesRef = useRef<any[]>([])
+  const categoriesRef = useRef<any[]>([])
+  const spanningEdgesRef = useRef<Array<[string, string]>>([])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -125,15 +90,9 @@ export function ConstellationGraph() {
     window.addEventListener("resize", setCanvasSize)
 
   // create animated node state (local to this effect)
-    const nodes = mockMerchants.map((m) => ({
-      ...m,
-      phase: Math.random() * Math.PI * 2,
-      ampX: 2 + Math.random() * 4,
-      ampY: 2 + Math.random() * 4,
-      // px/py are base percentage positions (0-100)
-      px: m.x,
-      py: m.y,
-    }))
+    // initial nodes are empty; we'll populate nodesRef and categoriesRef after calling the API
+    const nodes: any[] = []
+    nodesRef.current = nodes
 
     // per-edge highlight progress map (keyed by sorted id pair)
     const edgeProgress = new Map<string, number>()
@@ -147,10 +106,7 @@ export function ConstellationGraph() {
       edgeProgress.set(key, v)
     }
 
-    // initialize edges
-    mockMerchants.forEach((m) => {
-      m.connections.forEach((c) => setEdge(m.id, c, 0))
-    })
+    // edges will be created on-the-fly from nodesRef / categoriesRef when available
 
   let raf = 0
 
@@ -160,58 +116,79 @@ export function ConstellationGraph() {
       const t = Date.now() / 1000
 
       // Draw connections with smooth highlight interpolation
-      mockMerchants.forEach((merchant) => {
-        const nodeA = nodes.find((n) => n.id === merchant.id)!
-        const x1 = (nodeA.px / 100) * canvas.width + Math.sin(t + nodeA.phase) * nodeA.ampX
-        const y1 = (nodeA.py / 100) * canvas.height + Math.cos(t + nodeA.phase) * nodeA.ampY
+      const currentNodes = nodesRef.current || []
+      const cats = categoriesRef.current || []
 
-        merchant.connections.forEach((connId) => {
-          const connMerchant = nodes.find((n) => n.id === connId)
-          if (connMerchant) {
-            const x2 = (connMerchant.px / 100) * canvas.width + Math.sin(t + connMerchant.phase) * connMerchant.ampX
-            const y2 = (connMerchant.py / 100) * canvas.height + Math.cos(t + connMerchant.phase) * connMerchant.ampY
+      // collect edges from merchant->merchant and category->merchant
+      const edges: Array<[string, string]> = []
+      currentNodes.forEach((m: any) => {
+        (m.connections || []).forEach((otherId: string) => edges.push([m.id, otherId]))
+      })
+      cats.forEach((c: any) => {
+        (c.connections || []).forEach((mid: string) => edges.push([c.id, mid]))
+      })
 
-            // edge key and target highlight
-            const key = [merchant.id, connId].sort().join("-")
-            const currentHover = hoveredMerchantRef.current
-            const target = currentHover === merchant.id || currentHover === connId ? 1 : 0
-            const current = edgeProgress.get(key) || 0
-            const lerped = current + (target - current) * 0.12 // smooth interpolation
-            edgeProgress.set(key, lerped)
+      // unique
+      const uniq = new Set<string>()
+      const uniqueEdges: Array<[string, string]> = []
+      edges.forEach(([a, b]) => {
+        const key = [a, b].sort().join("-")
+        if (!uniq.has(key)) {
+          uniq.add(key)
+          uniqueEdges.push([a, b])
+        }
+      })
 
-            // visual parameters based on progress and priority
-            const prog = lerped
-            const isPriority = merchant.priority > 0.7 && connMerchant.priority > 0.7
-            const baseAlpha = isPriority ? 0.28 : 0.12
-            const alpha = baseAlpha + prog * 0.7
-            const width = 1 + prog * 2
+      uniqueEdges.forEach(([a, b]) => {
+        const na = currentNodes.find((n: any) => n.id === a) || cats.find((c: any) => c.id === a)
+        const nb = currentNodes.find((n: any) => n.id === b) || cats.find((c: any) => c.id === b)
+        if (!na || !nb) return
+        const x1 = (na.px ?? na.x) / 100 * canvas.width + (na.phase ? Math.sin(t + na.phase) * (na.ampX || 2) : 0)
+        const y1 = (na.py ?? na.y) / 100 * canvas.height + (na.phase ? Math.cos(t + na.phase) * (na.ampY || 2) : 0)
+        const x2 = (nb.px ?? nb.x) / 100 * canvas.width + (nb.phase ? Math.sin(t + nb.phase) * (nb.ampX || 2) : 0)
+        const y2 = (nb.py ?? nb.y) / 100 * canvas.height + (nb.phase ? Math.cos(t + nb.phase) * (nb.ampY || 2) : 0)
 
-            ctx.beginPath()
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x2, y2)
-            ctx.strokeStyle = `rgba(110,168,255,${alpha})`
-            ctx.lineWidth = width
-            ctx.lineCap = "round"
-            ctx.stroke()
-          }
-        })
+        const key = [a, b].sort().join('-')
+        const currentHover = hoveredMerchantRef.current
+        const target = currentHover === a || currentHover === b ? 1 : 0
+        const current = edgeProgress.get(key) || 0
+        const lerped = current + (target - current) * 0.12
+        edgeProgress.set(key, lerped)
+
+        const prog = lerped
+        const alpha = 0.12 + prog * 0.7
+        const width = 1 + prog * 2
+
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.strokeStyle = `rgba(110,168,255,${alpha})`
+        ctx.lineWidth = width
+        ctx.lineCap = 'round'
+        ctx.stroke()
       })
 
       // Draw nodes with subtle motion and hover/pulse effects
       let foundHover = false
-      mockMerchants.forEach((merchant) => {
-        const node = nodes.find((n) => n.id === merchant.id)!
+      const currentNodes2 = nodesRef.current || []
+      currentNodes2.forEach((merchant: any) => {
+        const node = merchant
         const x = (node.px / 100) * canvas.width + Math.sin(t + node.phase) * node.ampX
         const y = (node.py / 100) * canvas.height + Math.cos(t + node.phase) * node.ampY
         const baseRadius = 6 + (merchant.spendVolume / 500) * 2
         const radius = Math.min(baseRadius, 12)
 
         // Outer glow for high priority or hovered (subtle)
-  const currentHover = hoveredMerchantRef.current
-  if (currentHover === merchant.id || merchant.priority > 0.8) {
+        const currentHover = hoveredMerchantRef.current
+        // sanitize priority to avoid negative or extreme values coming from API/data
+        const priority = Math.max(0, Math.min(1, merchant.priority ?? 0.5))
+        if (currentHover === merchant.id || priority > 0.8) {
+          // compute glow radius and ensure it's non-negative before calling arc
+          const glowRadius = Math.max(0, radius + 12 * priority)
           ctx.beginPath()
-          ctx.arc(x, y, radius + 12 * (merchant.priority || 0.5), 0, Math.PI * 2)
-          const gradient = ctx.createRadialGradient(x, y, radius, x, y, radius + 12)
+          ctx.arc(x, y, glowRadius, 0, Math.PI * 2)
+          // outer radius for radial gradient should be >= inner radius; use same priority multiplier
+          const gradient = ctx.createRadialGradient(x, y, radius, x, y, radius + 12 * priority)
           const glowColor =
             merchant.type === "goal"
               ? "rgba(53, 224, 180, 0.28)"
@@ -234,7 +211,7 @@ export function ConstellationGraph() {
         else if (merchant.type === "goal") fillColor = "#35e0b4"
 
         // slight hover brighten
-  const isHovered = hoveredMerchantRef.current === merchant.id
+        const isHovered = hoveredMerchantRef.current === merchant.id
         ctx.fillStyle = isHovered ? brighten(fillColor, 0.15) : fillColor
         ctx.fill()
 
@@ -260,7 +237,8 @@ export function ConstellationGraph() {
           // Estimate label size and clamp inside canvas bounds
           const labelPaddingX = 12 // px padding (left+right)
           const charWidth = 7 // approx px per char for small text
-          const estWidth = merchant.name.length * charWidth + labelPaddingX
+          const merchantName = merchant.name || merchant.id
+          const estWidth = merchantName.length * charWidth + labelPaddingX
           const estHeight = 28
 
           // default preferred location: above-right of node
@@ -281,7 +259,7 @@ export function ConstellationGraph() {
             ly = canvas.height - estHeight - 8
           }
 
-          const newLabel = { x: lx, y: ly, name: merchant.name }
+          const newLabel = { x: lx, y: ly, name: merchantName }
           const prev = hoverLabelRef.current
           if (
             !prev ||
@@ -295,7 +273,72 @@ export function ConstellationGraph() {
         }
       })
 
-      if (!foundHover && hoverLabelRef.current) {
+      // draw category nodes and edges (read from ref to avoid effect deps)
+      const categoryNodes = categoriesRef.current || []
+      categoryNodes.forEach((cat) => {
+        // draw edges from category to connected merchants
+        const x1 = (cat.x / 100) * canvas.width
+        const y1 = (cat.y / 100) * canvas.height
+        cat.connections.forEach((connId: string) => {
+          const connMerchant = currentNodes.find((n: any) => n.id === connId)
+          if (!connMerchant) return
+          const x2 = (connMerchant.px / 100) * canvas.width + Math.sin(t + connMerchant.phase) * connMerchant.ampX
+          const y2 = (connMerchant.py / 100) * canvas.height + Math.cos(t + connMerchant.phase) * connMerchant.ampY
+          ctx.beginPath()
+          ctx.moveTo(x1, y1)
+          ctx.lineTo(x2, y2)
+          ctx.strokeStyle = 'rgba(53,224,180,0.18)'
+          ctx.lineWidth = 1
+          ctx.stroke()
+        })
+
+        // draw the category node (color from CATEGORY_COLOR_MAP when available)
+        const radius = Math.min(14, 6 + cat.spendVolume / 500)
+        ctx.beginPath()
+        ctx.arc(x1, y1, radius, 0, Math.PI * 2)
+        const catColor = CATEGORY_COLOR_MAP[cat.name] || TYPE_COLOR_MAP.category
+        const isHovered = hoveredMerchantRef.current === cat.id
+        ctx.fillStyle = isHovered ? brighten(catColor, 0.15) : catColor
+        ctx.fill()
+        ctx.strokeStyle = isHovered ? 'rgba(230,236,248,0.6)' : 'rgba(230,236,248,0.28)'
+        ctx.lineWidth = isHovered ? 2 : 1
+        ctx.stroke()
+
+        // hover label for category nodes
+        const displayName = (cat.name || '').toString().split('::').pop() || cat.name
+        if (hoveredMerchantRef.current === cat.id) {
+          foundHover = true
+          const labelPaddingX = 12
+          const charWidth = 7
+          const estWidth = (displayName || '').toString().length * charWidth + labelPaddingX
+          const estHeight = 28
+
+          let lx = Math.round(x1 + radius + 8)
+          let ly = Math.round(y1 - radius - 8)
+
+          if (lx + estWidth > canvas.width - 8) {
+            lx = Math.round(x1 - radius - 8 - estWidth)
+          }
+          if (lx < 8) lx = 8
+
+          if (ly < 8) {
+            ly = Math.round(y1 + radius + 12)
+          }
+          if (ly + estHeight > canvas.height - 8) {
+            ly = canvas.height - estHeight - 8
+          }
+
+          const newLabel = { x: lx, y: ly, name: displayName }
+          const prev = hoverLabelRef.current
+          if (!prev || prev.name !== newLabel.name || Math.hypot(prev.x - newLabel.x, prev.y - newLabel.y) > 0.5) {
+            hoverLabelRef.current = newLabel
+            setHoverLabel(newLabel)
+          }
+        }
+        // hover-only labels handled via hoverLabel state
+      })
+
+      if (!foundHover) {
         hoverLabelRef.current = null
         setHoverLabel(null)
       }
@@ -310,6 +353,316 @@ export function ConstellationGraph() {
       // @ts-ignore
       cancelAnimationFrame(raf)
     }
+  }, [])
+
+  // Debug helper: run a sample analyze call and populate the graph (mirrors curl command)
+  const runSample = async () => {
+    const sample = {
+      transactions: [
+        {
+          purchase_id: 't1',
+          merchant_id: 'm1',
+          amount: 12.34,
+          description: 'Amazon purchase',
+          purchase_date: '2025-10-18T00:00:00Z',
+        },
+      ],
+    }
+    // console.log('[ConstellationGraph] running sample analyze')
+    try {
+      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sample) })
+      const data = await res.json()
+      // console.log('[ConstellationGraph] sample response keys:', Object.keys(data || {}))
+      // console.log('[ConstellationGraph] sample debug.rawText (truncated):', (data?.debug?.rawText || '').toString().slice(0,4000))
+
+      // run the same normalization+node build used in the main effect
+      let normalized = normalizeAnalyzeResponse(data?.classified || data)
+      if ((!normalized.classified || normalized.classified.length === 0) && data?.debug?.parsed) normalized = normalizeAnalyzeResponse(data.debug.parsed)
+      if ((!normalized.classified || normalized.classified.length === 0) && data?.debug?.rawText) {
+        try {
+          const txt = (data.debug.rawText || '').toString()
+          const firstBrace = txt.indexOf('{')
+          const lastBrace = txt.lastIndexOf('}')
+          const firstBracket = txt.indexOf('[')
+          const lastBracket = txt.lastIndexOf(']')
+          let candidate: string | null = null
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) candidate = txt.slice(firstBrace, lastBrace+1)
+          else if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) candidate = txt.slice(firstBracket, lastBracket+1)
+          if (candidate) {
+            const parsedAgain = JSON.parse(candidate)
+            const normalized2 = normalizeAnalyzeResponse(parsedAgain)
+            if (normalized2.classified && normalized2.classified.length > 0) normalized = normalized2
+          }
+        } catch (e) { console.warn('sample rawText parse failed', e) }
+      }
+
+      // console.log('[ConstellationGraph] sample classified length:', normalized.classified.length)
+
+      // populate refs so the animation picks it up
+      const merchantsMap = new Map<string, any>()
+      normalized.classified.forEach((c: ClassifiedItem) => {
+        const mid = c.merchant_id || c.purchase_id || 'unknown'
+        const existing = merchantsMap.get(mid) || { id: mid, name: c.description || mid, connections: [], spendVolume: 0, recency: 0, priority: 0 }
+        existing.spendVolume = (existing.spendVolume || 0) + (c.amount || 0)
+        merchantsMap.set(mid, existing)
+      })
+      const merchantEntries = Array.from(merchantsMap.values())
+      // sanitize merchant node fields to safe ranges so drawing logic doesn't break
+      const merchantNodes = merchantEntries.map((m, i) => {
+        const sanitizedPriority = Math.max(0, Math.min(1, (m.priority ?? m.confidence ?? 0.5)))
+        const sanitizedRecency = Math.max(0, Math.min(1, (m.recency ?? 0.5)))
+        const sanitizedSpend = Math.max(0, (m.spendVolume ?? 0))
+        // Use larger grid with more spread
+        const cols = Math.ceil(Math.sqrt(merchantEntries.length))
+        const spacing = 140 / Math.max(1, cols - 1)
+        const col = i % cols
+        const row = Math.floor(i / cols)
+        const jitterX = (Math.random() - 0.5) * 12
+        const jitterY = (Math.random() - 0.5) * 12
+        const baseX = 10 + col * spacing + jitterX
+        const baseY = 10 + row * spacing + jitterY
+        const px = Math.max(3, Math.min(97, (m.px ?? baseX)))
+        const py = Math.max(3, Math.min(97, (m.py ?? baseY)))
+        const nodeType = (m.type === 'subscription' || m.type === 'category' || m.type === 'goal') ? m.type : 'merchant'
+        return {
+          ...m,
+          type: nodeType,
+          phase: Math.random() * Math.PI * 2,
+          ampX: 2 + Math.random() * 3,
+          ampY: 2 + Math.random() * 3,
+          px,
+          py,
+          priority: sanitizedPriority,
+          recency: sanitizedRecency,
+          spendVolume: sanitizedSpend,
+        }
+      })
+      const categoriesMap = new Map<string, any>()
+      normalized.classified.forEach((c: ClassifiedItem) => {
+        const catKey = c.category || 'Unknown'
+        if (!categoriesMap.has(catKey)) categoriesMap.set(catKey, { id: `cat-${categoriesMap.size}`, name: catKey, connections: [], spendVolume: 0 })
+        const node = categoriesMap.get(catKey)
+        node.spendVolume += c.amount || 0
+        const mid = c.merchant_id || c.purchase_id || ''
+        if (mid && !node.connections.includes(mid)) node.connections.push(mid)
+      })
+      const cats = Array.from(categoriesMap.values()).map((c) => ({ ...c, x: 15+Math.random()*120, y: 15+Math.random()*120 }))
+
+      nodesRef.current = merchantNodes
+      categoriesRef.current = cats
+      setIsLoading(false)
+      // console.log('[ConstellationGraph] sample populated nodes:', merchantNodes.length, 'cats:', cats.length)
+    } catch (e) {
+      console.warn('sample analyze failed', e)
+    }
+  }
+
+  // Fetch classifications once on mount. Show loading until populated.
+  useEffect(() => {
+    let cancelled = false
+    const doFetch = async () => {
+      setIsLoading(true)
+      try {
+        // console.log('[ConstellationGraph] starting /api/analyze fetch')
+        // For now we send an empty transactions array; backend may accept this or return sample
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: [] }),
+        })
+        if (!res.ok) throw new Error(`status ${res.status}`)
+        const data = await res.json()
+        // console.log('[ConstellationGraph] /api/analyze returned (first level keys):', data && typeof data === 'object' ? Object.keys(data) : typeof data)
+        // debug: log debug.rawText if present
+        if (data && data.debug) {
+          try {
+            // console.log('[ConstellationGraph] debug.rawText (truncated):', (data.debug.rawText || '').toString().slice(0,2000))
+          } catch (e) {}
+          try {
+            // console.log('[ConstellationGraph] debug.parsed keys:', data.debug.parsed ? Object.keys(data.debug.parsed) : null)
+          } catch (e) {}
+        }
+
+        // Try normalization from several plausible places
+        let normalized = normalizeAnalyzeResponse(data?.classified || data)
+        // console.log('[ConstellationGraph] normalized.classified length (initial):', Array.isArray(normalized.classified) ? normalized.classified.length : 'not-array')
+
+        // fallback: if normalized empty, try debug.parsed
+        if ((!normalized.classified || normalized.classified.length === 0) && data?.debug?.parsed) {
+          // console.log('[ConstellationGraph] fallback: normalizing data.debug.parsed')
+          normalized = normalizeAnalyzeResponse(data.debug.parsed)
+          // console.log('[ConstellationGraph] normalized.classified length (from debug.parsed):', normalized.classified.length)
+        }
+
+        // fallback: try parsing debug.rawText as JSON (strip fences) on client side
+        if ((!normalized.classified || normalized.classified.length === 0) && data?.debug?.rawText) {
+          try {
+            // naive attempt: look for first { or [ and parse substring
+            const txt = (data.debug.rawText || '').toString()
+            const firstBrace = txt.indexOf('{')
+            const lastBrace = txt.lastIndexOf('}')
+            const firstBracket = txt.indexOf('[')
+            const lastBracket = txt.lastIndexOf(']')
+            let candidate: string | null = null
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) candidate = txt.slice(firstBrace, lastBrace+1)
+            else if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) candidate = txt.slice(firstBracket, lastBracket+1)
+            if (candidate) {
+              try {
+                const parsedAgain = JSON.parse(candidate)
+                const normalized2 = normalizeAnalyzeResponse(parsedAgain)
+                // console.log('[ConstellationGraph] normalized.classified length (from debug.rawText):', normalized2.classified.length)
+                if (normalized2.classified && normalized2.classified.length > 0) normalized = normalized2
+              } catch (e) { 
+                // console.log('[ConstellationGraph] client-side rawText parse failed') 
+                }
+            }
+          } catch (e) { 
+            // console.log('[ConstellationGraph] client-side debug.rawText fallback failed') 
+          }
+        }
+        const classifiedArray: ClassifiedItem[] = normalized.classified || []
+
+        // Build merchant nodes from classified transactions (group by merchant_id)
+        const merchantsMap = new Map<string, any>()
+        classifiedArray.forEach((c) => {
+          const mid = c.merchant_id || c.purchase_id || 'unknown'
+          const existing = merchantsMap.get(mid) || {
+            id: mid,
+            name: c.description || mid,
+            type: 'merchant',
+            connections: [] as string[],
+            spendVolume: 0,
+            recency: 0,
+            priority: 0,
+          }
+          existing.spendVolume = (existing.spendVolume || 0) + (c.amount || 0)
+          try {
+            const ts = new Date(c.purchase_date).getTime()
+            existing.recency = Math.max(existing.recency || 0, ts / Date.now())
+          } catch (e) {}
+          existing.priority = Math.max(existing.priority || 0, c.confidence || 0)
+          merchantsMap.set(mid, existing)
+        })
+
+        const merchantEntries = Array.from(merchantsMap.values())
+        const mCnt = merchantEntries.length
+        const cols2 = Math.ceil(Math.sqrt(Math.max(1, mCnt)))
+        const spacing2 = 140 / Math.max(1, cols2 - 1)  // Increased from 80 to 140 for more spacing
+        // sanitize merchant nodes to ensure drawing math stays in safe ranges
+        const merchantNodes = merchantEntries.map((m: any, i: number) => {
+          const col = i % cols2
+          const row = Math.floor(i / cols2)
+          const jitterX = (Math.random() - 0.5) * 12  // Increased jitter for more spread
+          const jitterY = (Math.random() - 0.5) * 12  // Increased jitter for more spread
+          const baseX = 10 + col * spacing2 + jitterX
+          const baseY = 10 + row * spacing2 + jitterY
+          const sanitizedPriority = Math.max(0, Math.min(1, (m.priority ?? m.confidence ?? 0.5)))
+          const sanitizedRecency = Math.max(0, Math.min(1, (m.recency ?? 0.5)))
+          const sanitizedSpend = Math.max(0, (m.spendVolume ?? 0))
+          const px = Math.max(3, Math.min(97, baseX))  // Adjusted bounds for larger grid
+          const py = Math.max(3, Math.min(97, baseY))  // Adjusted bounds for larger grid
+          return {
+            id: m.id,
+            name: m.name || m.id,
+            type: 'merchant',
+            x: baseX,
+            y: baseY,
+            connections: m.connections || [],
+            spendVolume: sanitizedSpend,
+            recency: sanitizedRecency,
+            priority: sanitizedPriority,
+            phase: Math.random() * Math.PI * 2,
+            ampX: 2 + Math.random() * 3,
+            ampY: 2 + Math.random() * 3,
+            px,
+            py,
+          }
+        })
+
+        // Build category nodes
+        const categoriesMap = new Map<string, any>()
+        classifiedArray.forEach((c) => {
+          const catKey = c.category || 'Unknown'
+          if (!categoriesMap.has(catKey)) {
+            const idx = categoriesMap.size
+            categoriesMap.set(catKey, {
+              id: `cat-${idx}`,
+              name: catKey,
+              type: 'category',
+              x: 15 + (idx % 4) * 30,  // Increased spacing for categories
+              y: 15 + Math.floor(idx / 4) * 28,  // Increased spacing for categories
+              connections: [],
+              spendVolume: 0,
+              recency: 0.5,
+              priority: 0.6,
+            })
+          }
+          const node = categoriesMap.get(catKey)
+          node.spendVolume += c.amount || 0
+          const mid = c.merchant_id || c.purchase_id || ''
+          if (mid && !node.connections.includes(mid)) node.connections.push(mid)
+        })
+
+        const cats = Array.from(categoriesMap.values()).map((c) => ({
+          ...c,
+          x: 15 + Math.random() * 120,  // Increased spread for categories
+          y: 15 + Math.random() * 120,  // Increased spread for categories
+        }))
+
+  if (cancelled) return
+  // console.log('[ConstellationGraph] built', merchantNodes.length, 'merchantNodes and', cats.length, 'categories')
+
+        // ensure connectivity: compute minimal spanning edges between components (optional)
+        const allNodes = [...merchantNodes.map((m) => ({ id: m.id, x: m.px || m.x, y: m.py || m.y })), ...cats.map((c) => ({ id: c.id, x: c.x, y: c.y }))]
+        const idxMap = new Map<string, number>()
+        allNodes.forEach((n, i) => idxMap.set(n.id, i))
+        const parent = new Array(allNodes.length).fill(0).map((_, i) => i)
+        const find = (a: number): number => parent[a] === a ? a : (parent[a] = find(parent[a]))
+        const union = (a: number, b: number) => { const pa = find(a); const pb = find(b); if (pa !== pb) parent[pa] = pb }
+        cats.forEach((c) => {
+          c.connections.forEach((mid: string) => {
+            const a = idxMap.get(c.id)
+            const b = idxMap.get(mid)
+            if (a !== undefined && b !== undefined) union(a, b)
+          })
+        })
+        const dist = (a: any, b: any) => Math.hypot((a.x - b.x), (a.y - b.y))
+        const spanningEdges: Array<[string, string]> = []
+        const components = () => new Set(parent.map((_, i) => find(i)))
+        while (components().size > 1) {
+          let best: { d: number, aIdx: number, bIdx: number } | null = null
+          for (let i = 0; i < allNodes.length; i++) {
+            for (let j = i+1; j < allNodes.length; j++) {
+              if (find(i) === find(j)) continue
+              const d = dist(allNodes[i], allNodes[j])
+              if (!best || d < best.d) best = { d, aIdx: i, bIdx: j }
+            }
+          }
+          if (!best) break
+          union(best.aIdx, best.bIdx)
+          const aId = allNodes[best.aIdx].id
+          const bId = allNodes[best.bIdx].id
+          spanningEdges.push([aId, bId])
+        }
+
+        // write to refs used by animation
+  nodesRef.current = merchantNodes
+  categoriesRef.current = cats
+
+        // store spanning edges so drawing picks them up
+        // @ts-ignore
+        ;(window as any).__spanningEdges = spanningEdges
+
+        setIsLoading(false)
+        // console.log('[ConstellationGraph] setIsLoading(false)')
+      } catch (e) {
+        console.warn('analyze fetch failed', e)
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    doFetch()
+    return () => { cancelled = true }
   }, [])
 
 
@@ -338,14 +691,35 @@ function brighten(hex: string, amt: number) {
     const clickX = e.clientX - rect.left
     const clickY = e.clientY - rect.top
 
-    const clicked = mockMerchants.find((merchant) => {
-      const x = (merchant.x / 100) * canvas.width
-      const y = (merchant.y / 100) * canvas.height
-      const baseRadius = 6 + (merchant.spendVolume / 500) * 2
+    // Check merchant nodes first
+    const nodes = nodesRef.current || []
+    let clicked: any = null
+    for (const n of nodes) {
+      const x = (n.px / 100) * canvas.width + Math.sin(Date.now() / 1000 + n.phase) * n.ampX
+      const y = (n.py / 100) * canvas.height + Math.cos(Date.now() / 1000 + n.phase) * n.ampY
+      const baseRadius = 6 + (n.spendVolume / 500) * 2
       const radius = Math.min(baseRadius, 12)
-      const distance = Math.sqrt((clickX - x) ** 2 + (clickY - y) ** 2)
-      return distance <= radius + 5
-    })
+      const distance = Math.hypot(clickX - x, clickY - y)
+      if (distance <= radius + 5) {
+        clicked = n
+        break
+      }
+    }
+
+    // If no merchant was clicked, check category nodes
+    if (!clicked) {
+      const cats = categoriesRef.current || []
+      for (const c of cats) {
+        const x = (c.x / 100) * canvas.width
+        const y = (c.y / 100) * canvas.height
+        const radius = Math.min(14, 6 + c.spendVolume / 500)
+        const distance = Math.hypot(clickX - x, clickY - y)
+        if (distance <= radius + 5) {
+          clicked = c
+          break
+        }
+      }
+    }
 
     setSelectedMerchant(clicked || null)
   }
@@ -358,25 +732,72 @@ function brighten(hex: string, amt: number) {
     const mouseX = e.clientX - rect.left
     const mouseY = e.clientY - rect.top
 
-    const hovered = mockMerchants.find((merchant) => {
-      const x = (merchant.x / 100) * canvas.width
-      const y = (merchant.y / 100) * canvas.height
-      const baseRadius = 6 + (merchant.spendVolume / 500) * 2
+    // check animated merchant nodes first
+    const nodes = nodesRef.current || []
+    let found: any = null
+    for (const n of nodes) {
+      const x = (n.px / 100) * canvas.width + Math.sin(Date.now() / 1000 + n.phase) * n.ampX
+      const y = (n.py / 100) * canvas.height + Math.cos(Date.now() / 1000 + n.phase) * n.ampY
+      const baseRadius = 6 + (n.spendVolume / 500) * 2
       const radius = Math.min(baseRadius, 12)
-      const distance = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2)
-      return distance <= radius + 5
-    })
+      const distance = Math.hypot(mouseX - x, mouseY - y)
+      if (distance <= radius + 6) {
+        found = n
+        break
+      }
+    }
 
-    // set both ref and state; animation loop reads the ref to avoid reinitialization
-    hoveredMerchantRef.current = hovered?.id || null
-    setHoveredMerchant(hovered?.id || null)
+    // if merchant found, set hover and return
+    if (found) {
+      hoveredMerchantRef.current = found.id
+      setHoveredMerchant(found.id)
+      // debug
+      // console.log intentionally left sparse to avoid spamming raf loop; log only when changed
+      console.log('[ConstellationGraph] hover merchant id=', found.id)
+      return
+    }
+
+    // otherwise check category nodes
+    const cats = categoriesRef.current || []
+    let foundCat: any = null
+    for (const c of cats) {
+      const x = (c.x / 100) * canvas.width
+      const y = (c.y / 100) * canvas.height
+      const radius = Math.min(14, 6 + c.spendVolume / 500)
+      const distance = Math.hypot(mouseX - x, mouseY - y)
+      if (distance <= radius + 6) {
+        foundCat = c
+        break
+      }
+    }
+
+    if (foundCat) {
+      hoveredMerchantRef.current = foundCat.id
+      setHoveredMerchant(foundCat.id)
+      console.log('[ConstellationGraph] hover category id=', foundCat.id)
+      return
+    }
+
+    hoveredMerchantRef.current = null
+    setHoveredMerchant(null)
+    // debug
+    // console.log('[ConstellationGraph] hover cleared')
   }
 
   return (
     <div className="px-4 max-w-md mx-auto">
       <div className="mb-4">
         <h2 className="text-xl font-semibold text-foreground mb-1">Financial Constellation</h2>
-        <p className="text-sm text-muted-foreground">Your spending network mapped</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">Your spending network mapped</p>
+          <button
+            type="button"
+            onClick={runSample}
+            className="text-xs px-2 py-1 rounded bg-accent/10 hover:bg-accent/20"
+          >
+            Run sample analyze
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -390,6 +811,16 @@ function brighten(hex: string, amt: number) {
               className="w-full h-full cursor-pointer bg-transparent"
               style={{ background: 'transparent' }}
             />
+
+            {/* Loading overlay */}
+            {isLoading && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/40 rounded-md p-3 flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full animate-spin border-2 border-white/80 border-t-transparent" />
+                  <div className="text-white text-sm">Classifying transactions...</div>
+                </div>
+              </div>
+            )}
 
             {/* Hover label rendered as HTML for crisp text */}
             {hoverLabel && (
@@ -405,7 +836,7 @@ function brighten(hex: string, amt: number) {
           </div>
         </Card>
 
-        {selectedMerchant && (
+        {!isLoading && selectedMerchant && (
           <Card className="mt-4 p-4 bg-card border-border">
             <div className="flex items-start justify-between mb-3">
               <div>
@@ -459,22 +890,12 @@ function brighten(hex: string, amt: number) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-4 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-primary" />
-          <span className="text-muted-foreground">Merchant</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#ffd66e]" />
-          <span className="text-muted-foreground">Subscription</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#9fb3d1]" />
-          <span className="text-muted-foreground">Category</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[#35e0b4]" />
-          <span className="text-muted-foreground">Goal</span>
-        </div>
+        {Object.entries(TYPE_COLOR_MAP).map(([typeKey, color]) => (
+          <div key={typeKey} className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ background: color }} />
+            <span className="text-muted-foreground">{typeKey.charAt(0).toUpperCase() + typeKey.slice(1)}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
