@@ -4,9 +4,9 @@ import requests
 import os
 import json
 from fastapi.middleware.cors import CORSMiddleware
-
+from dotenv import load_dotenv
 app = FastAPI()
-
+load_dotenv()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Or ["http://localhost:3000"] for more security
@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "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")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 # Load sample transactions from data.json (used instead of request.transactions)
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'data.json')
@@ -35,7 +35,7 @@ class InsightRequest(BaseModel):
 @app.post("/analyze")
 def analyze(request: AnalyzeRequest):
     # Try to fetch Nessie purchases
-    nessie_url = "http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b"
+    nessie_url = nessie_url = f"http://api.nessieisreal.com/accounts/{os.getenv('NESSIE_CUSTOMER_ACCOUNT')}/purchases?key={os.getenv('NESSIE_API_KEY')}"
     nessie_transactions = []
     try:
         nessie_res = requests.get(nessie_url, headers={"Content-Type": "application/json"}, timeout=5)
@@ -163,7 +163,7 @@ Transactions:
     
 @app.post("/fetch_insights")
 def fetch_insights(request: InsightRequest):
-    nessie_url = "http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b"
+    nessie_url = nessie_url = f"http://api.nessieisreal.com/accounts/{os.getenv('NESSIE_CUSTOMER_ACCOUNT')}/purchases?key={os.getenv('NESSIE_API_KEY')}"
     nessie_transactions = []
     try:
         nessie_res = requests.get(nessie_url, headers={"Content-Type": "application/json"}, timeout=5)
