@@ -1,113 +1,78 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { InsightCard } from "@/components/insight-card"
-import { BlackholeZone } from "@/components/blackhole-zone"
+import { useSession } from 'next-auth/react';
+import { InsightCard } from '@/components/insight-card';
+import { BlackholeZone } from '@/components/blackhole-zone';
 
-// Sample financial insights data
-const sampleInsights = [
-  {
-    id: "1",
-    kind: "subscription" as const,
-    title: "Spotify price increased",
-    merchantOrBill: "Spotify",
-    amount: 10.99,
-    date: "2025-10-01T10:22:00Z",
-    account: "Capital One Savor",
-    category: "Entertainment",
-    delta30: 1.0,
-    delta90: 1.0,
-    aiHeader: {
-      bullets: [
-        "Price up $1.00 vs last month",
-        "Duplicate service: also paying Apple Music",
-        "Low usage in past 60 days",
-      ],
-      nextStep: "Keep Spotify, cancel Apple Music?",
-      badges: ["priority", "priceUp", "duplicateSub"],
-      confidence: 0.91,
-    },
-  },
-  {
-    id: "2",
-    kind: "bill" as const,
-    title: "Electric bill due soon",
-    merchantOrBill: "Pacific Gas & Electric",
-    amount: 142.5,
-    date: "2025-10-15T00:00:00Z",
-    account: "Chase Checking",
-    category: "Utilities",
-    delta30: 12.5,
-    delta90: -5.2,
-    aiHeader: {
-      bullets: ["Due in 3 days", "Up 9.6% from last month", "Balance sufficient to pay"],
-      nextStep: "Schedule payment now?",
-      badges: ["dueSoon"],
-      confidence: 0.95,
-    },
-  },
-  {
-    id: "3",
-    kind: "anomaly" as const,
-    title: "Unusual spending detected",
-    merchantOrBill: "Amazon",
-    amount: 287.43,
-    date: "2025-10-12T14:30:00Z",
-    account: "Capital One Savor",
-    category: "Shopping",
-    delta30: 150.0,
-    delta90: 200.0,
-    aiHeader: {
-      bullets: ["3x your typical Amazon spend", "Multiple charges in one day", "Consider setting a monthly cap"],
-      nextStep: "Review charges or set budget alert?",
-      badges: ["anomaly"],
-      confidence: 0.88,
-    },
-  },
-  {
-    id: "4",
-    kind: "goal" as const,
-    title: "Emergency fund progress",
-    merchantOrBill: "Savings Goal",
-    amount: 3250.0,
-    date: "2025-10-18T00:00:00Z",
-    account: "High-Yield Savings",
-    category: "Savings",
-    delta30: 500.0,
-    delta90: 1250.0,
-    aiHeader: {
-      bullets: ["65% to your $5,000 target", "On track to reach goal in 4 months", "Found $150 excess in checking"],
-      nextStep: "Sweep excess to savings?",
-      badges: [],
-      confidence: 0.92,
-    },
-  },
-  {
-    id: "5",
-    kind: "advice" as const,
-    title: "Subscription optimization",
-    merchantOrBill: "Multiple Services",
-    amount: 89.97,
-    date: "2025-10-18T00:00:00Z",
-    account: "Multiple Accounts",
-    category: "Subscriptions",
-    delta30: 0,
-    delta90: 0,
-    aiHeader: {
-      bullets: [
-        "Paying for 3 streaming services",
-        "Could save $30/mo with family plan",
-        "Netflix, Hulu, Disney+ detected",
-      ],
-      nextStep: "Switch to bundle plan?",
-      badges: ["priority"],
-      confidence: 0.87,
-    },
-  },
-]
+// Define the Insight type directly here
+type Insight = {
+  id: string;
+  kind: 'subscription' | 'bill' | 'anomaly' | 'goal' | 'advice';
+  title: string;
+  merchantOrBill: string;
+  amount: number;
+  date: string;
+  account: string;
+  category: string;
+  delta30: number;
+  delta90: number;
+  aiHeader: {
+    bullets: string[];
+    nextStep: string;
+    badges: string[];
+    confidence: number;
+  };
+};
 
-export function FeedView() {
-  const [currentIndex, setCurrentIndex] = useState(0)
+export default function Dashboard() {
+  const { data: session } = useSession();
+  const [insights, setInsights] = useState<Insight[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!session) return;
+
+    async function getAIResults() {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/ai-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'gmail', maxResults: 20 }),
+        });
+
+        const data = await res.json();
+        if (data.success && Array.isArray(data.result)) {
+          setInsights(data.result);
+        } else {
+          console.error(data.error);
+          setInsights([]);
+        }
+      } catch (err) {
+        console.error(err);
+        setInsights([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    getAIResults();
+  }, [session]);
+
+  if (loading) return <div>Loading your insights...</div>;
+  if (!insights || insights.length === 0) return <div>No financial insights found.</div>;
+
+  return <FeedView initialInsights={insights} />;
+}
+
+interface FeedViewProps {
+  initialInsights: Insight[];
+}
+
+function FeedView({ initialInsights }: FeedViewProps) {
+  const [visibleCards, setVisibleCards] = useState(initialInsights);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -118,8 +83,7 @@ export function FeedView() {
   const [holdProgress, setHoldProgress] = useState(0)
   const [cardDragPosition, setCardDragPosition] = useState<{x: number, y: number} | null>(null)
   const [isNearBlackhole, setIsNearBlackhole] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [visibleCards, setVisibleCards] = useState(sampleInsights)
+  const [isDeleting, setIsDeleting] = useState(false);
   const [blackholeTimer, setBlackholeTimer] = useState<NodeJS.Timeout | null>(null)
   const pressTimerRef = useRef<NodeJS.Timeout>()
   const holdAnimationRef = useRef<number>()

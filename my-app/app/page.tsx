@@ -4,7 +4,7 @@ import { useState } from "react"
 import { StarfieldBackground } from "@/components/starfield-background"
 import { BottomNav } from "@/components/bottom-nav"
 import { MobileHeader } from "@/components/mobile-header"
-import { FeedView } from "@/components/feed-view"
+import Dashboard from "@/components/dashboard"
 import { ConstellationGraph } from "@/components/constellation-graph"
 import { TransactionsView } from "@/components/transactions-view"
 import { GoalsView } from "@/components/goals-view"
@@ -23,7 +23,7 @@ export default function Home() {
           <MobileHeader />
 
           <main className="pb-24 pt-2">
-            {activeTab === "feed" && <FeedView />}
+            {activeTab === "feed" && <Dashboard />}
             {activeTab === "constellations" && <ConstellationGraph />}
             {activeTab === "transactions" && <TransactionsView />}
             {activeTab === "goals" && <GoalsView />}
