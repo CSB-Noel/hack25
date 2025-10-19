@@ -5,6 +5,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import { GmailService } from "@/lib/gmail-service";
 import { OutlookService } from "@/lib/outlook-service";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { serverStore } from "@/lib/serverStore"
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,10 +63,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 3️⃣ Combine and clean
-    const combinedInsights = [...emailInsights, ...nessieInsights].map((insight) => ({
-      ...insight,
-      amount: insight.amount ?? 0,
-    }));
+    const combinedInsights = [...emailInsights, ...nessieInsights];
+
+    serverStore.getState().setInsights(combinedInsights);
 
     return NextResponse.json({
       success: true,

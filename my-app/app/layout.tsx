@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: "Orion",
   description: "Navigate your finances like the cosmos",
   generator: "v0.app",
+  icons: {
+    icon: "/star.svg",
+    shortcut: "/star.svg",
+    apple: "/star.svg",
+  },
 }
 
 export default function RootLayout({
