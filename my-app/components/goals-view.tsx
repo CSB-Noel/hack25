@@ -1,13 +1,10 @@
 "use client"
 
-import * as React from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Target, TrendingUp, Plus, DollarSign, Calendar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 
 interface Goal {
   id: string
@@ -72,98 +69,6 @@ export function GoalsView() {
     }
   }
 
-  // state: manage goals and single-account excess reserves
-  const [excessReserves, setExcessReserves] = React.useState<number>(2500)
-  const [goals, setGoals] = React.useState<Goal[]>(sampleGoals)
-
-  // Add goal dialog state
-  const [isAddOpen, setIsAddOpen] = React.useState(false)
-  const [addName, setAddName] = React.useState("")
-  const [addTarget, setAddTarget] = React.useState<number | undefined>(undefined)
-  const [addPercent, setAddPercent] = React.useState<number>(0)
-
-  // compute maximum percent that can be allocated without overflowing the goal
-  const maxAddPercent = React.useMemo(() => {
-    if (!addTarget || excessReserves <= 0) return 100
-    // percent = (addTarget / excessReserves) * 100
-    const pct = Math.floor((addTarget / excessReserves) * 100)
-    return Math.min(100, Math.max(0, pct))
-  }, [addTarget, excessReserves])
-
-  // clamp addPercent when max changes
-  React.useEffect(() => {
-    if (addPercent > maxAddPercent) setAddPercent(maxAddPercent)
-  }, [maxAddPercent])
-
-  // Contribute dialog state
-  const [contributeTarget, setContributeTarget] = React.useState<Goal | null>(null)
-  const [contributeAmount, setContributeAmount] = React.useState<number>(0)
-
-  // Handlers
-  const handleCreateGoal = () => {
-    if (!addName || !addTarget) return
-    // Amount taken from excess reserves = percentage of current excess reserves
-    // desired amount based on selected percent of excess reserves (rounded to cents)
-    const desired = Math.round((addPercent / 100) * excessReserves * 100) / 100
-    // don't allocate more than we have, and never more than the goal's target (can't overfill on creation)
-    const amount = Math.round(Math.min(excessReserves, desired, addTarget) * 100) / 100
-
-    const newGoal: Goal = {
-      id: String(Date.now()),
-      title: addName,
-      target: addTarget,
-      current: amount,
-      eta: "-",
-      suggestedContribution: 0,
-      category: "savings",
-    }
-
-    setGoals((g) => [newGoal, ...g])
-    setExcessReserves((r) => Math.round((r - amount) * 100) / 100)
-    setAddName("")
-    setAddTarget(undefined)
-    setAddPercent(0)
-    setIsAddOpen(false)
-  }
-
-  const openContribute = (goal: Goal) => {
-    const maxContribute = Math.min(excessReserves, Math.max(0, goal.target - goal.current))
-    setContributeTarget(goal)
-    // default to 25% of maxContribute for convenience (rounded to cents)
-    setContributeAmount(Math.round((maxContribute * 0.25) * 100) / 100)
-  }
-
-  // Withdraw state
-  const [withdrawTarget, setWithdrawTarget] = React.useState<Goal | null>(null)
-  const [withdrawAmount, setWithdrawAmount] = React.useState<number>(0)
-
-  const openWithdraw = (goal: Goal) => {
-    setWithdrawTarget(goal)
-    // default to 25% of goal.current
-    setWithdrawAmount(Math.round((goal.current * 0.25) * 100) / 100)
-  }
-
-  const handleWithdraw = () => {
-    if (!withdrawTarget) return
-    const amount = Math.min(withdrawAmount, withdrawTarget.current)
-    if (amount <= 0) return
-
-    setGoals((prev) => prev.map((g) => (g.id === withdrawTarget.id ? { ...g, current: Math.round((g.current - amount) * 100) / 100 } : g)))
-    setExcessReserves((r) => Math.round((r + amount) * 100) / 100)
-    setWithdrawTarget(null)
-  }
-
-  const handleContribute = () => {
-    if (!contributeTarget) return
-    const maxNeeded = contributeTarget.target - contributeTarget.current
-    const amount = Math.min(contributeAmount, excessReserves, Math.max(0, maxNeeded))
-    if (amount <= 0) return
-
-    setGoals((prev) => prev.map((g) => (g.id === contributeTarget.id ? { ...g, current: Math.round((g.current + amount) * 100) / 100 } : g)))
-    setExcessReserves((r) => Math.round((r - amount) * 100) / 100)
-    setContributeTarget(null)
-  }
-
   return (
     <div className="px-4 max-w-md mx-auto pb-4">
       <div className="mb-4 flex items-center justify-between">
@@ -171,48 +76,9 @@ export function GoalsView() {
           <h2 className="text-xl font-semibold text-foreground mb-1">Goals</h2>
           <p className="text-sm text-muted-foreground">Track your financial targets</p>
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button size="icon" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
-              <Plus className="w-5 h-5" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Goal</DialogTitle>
-              <DialogDescription>Create a new goal and allocate some of your excess reserves to kick it off.</DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 mt-2">
-              <div>
-                <label className="text-sm text-muted-foreground block mb-1">Name</label>
-                <Input value={addName} onChange={(e) => setAddName((e.target as HTMLInputElement).value)} placeholder="e.g., New Camera" />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground block mb-1">Target Amount</label>
-                <Input type="number" value={addTarget ?? ""} onChange={(e) => setAddTarget(Number((e.target as HTMLInputElement).value))} placeholder="500" />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground block mb-1">Percent of excess reserves to allocate: {addPercent}% (max {maxAddPercent}%)</label>
-                <input
-                  type="range"
-                  min={0}
-                  max={maxAddPercent}
-                  value={addPercent}
-                  onChange={(e) => setAddPercent(Number((e.target as HTMLInputElement).value))}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Available excess reserves: ${excessReserves.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Max allocatable to this goal: ${Math.round(Math.min(excessReserves, addTarget ?? Infinity) * 100) / 100}</p>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateGoal} className="bg-primary">Create</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button size="icon" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25">
+          <Plus className="w-5 h-5" />
+        </Button>
       </div>
 
       {/* Summary card */}
@@ -229,174 +95,93 @@ export function GoalsView() {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Total Saved</span>
-            <span className="font-semibold text-foreground">${goals.reduce((sum, goal) => sum + goal.current, 0).toFixed(2)}</span>
+            <span className="font-semibold text-foreground">
+              ${sampleGoals.reduce((sum, goal) => sum + goal.current, 0).toFixed(2)}
+            </span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Total Target</span>
-            <span className="font-semibold text-foreground">${goals.reduce((sum, goal) => sum + goal.target, 0).toFixed(2)}</span>
+            <span className="font-semibold text-foreground">
+              ${sampleGoals.reduce((sum, goal) => sum + goal.target, 0).toFixed(2)}
+            </span>
           </div>
           <Progress
             value={
-              (goals.reduce((sum, goal) => sum + goal.current, 0) / goals.reduce((sum, goal) => sum + goal.target, 0)) * 100
+              (sampleGoals.reduce((sum, goal) => sum + goal.current, 0) /
+                sampleGoals.reduce((sum, goal) => sum + goal.target, 0)) *
+              100
             }
             className="h-2"
           />
-          <div className="mt-2 text-sm">
-            <span className="text-muted-foreground">Excess reserves:</span>
-            <span className="font-semibold ml-2">${excessReserves.toFixed(2)}</span>
-          </div>
         </div>
       </Card>
 
       {/* Goals list */}
       <div className="space-y-3">
-        {(() => {
-          const completed = goals.filter((g) => g.current >= g.target)
-          const incomplete = goals.filter((g) => g.current < g.target)
-          const sortedGoals = [...completed, ...incomplete]
+        {sampleGoals.map((goal) => {
+          const progress = (goal.current / goal.target) * 100
 
-          return sortedGoals.map((goal) => {
-            const isComplete = goal.current >= goal.target
-            const progress = (goal.current / goal.target) * 100
+          return (
+            <Card key={goal.id} className="p-4 bg-card border-border hover:border-primary/50 transition-colors">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-foreground mb-1">{goal.title}</h3>
+                  <Badge variant="secondary" className={getCategoryColor(goal.category)}>
+                    {goal.category}
+                  </Badge>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Progress</p>
+                  <p className="text-lg font-bold text-primary">{progress.toFixed(0)}%</p>
+                </div>
+              </div>
 
-            return (
-              <Card
-                key={goal.id}
-                className={`p-4 bg-card border-border hover:border-primary/50 transition-colors ${isComplete ? "ring-2 ring-green-200 border-green-400/60" : ""}`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground mb-1">{goal.title}</h3>
-                    <Badge variant="secondary" className={getCategoryColor(goal.category)}>
-                      {goal.category}
-                    </Badge>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">
+                      ${goal.current.toFixed(2)} of ${goal.target.toFixed(2)}
+                    </span>
+                    <span className="text-muted-foreground">${(goal.target - goal.current).toFixed(2)} to go</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Progress</p>
-                    <p className="text-lg font-bold text-primary">{progress.toFixed(0)}%</p>
+                  <Progress value={progress} className="h-2" />
+                </div>
+
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Calendar className="w-4 h-4" />
+                    <span>ETA: {goal.eta}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[#35e0b4]">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>+${goal.suggestedContribution.toFixed(2)}/mo</span>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">
-                        ${goal.current.toFixed(2)} of ${goal.target.toFixed(2)}
-                      </span>
-                      <span className="text-muted-foreground">${(goal.target - goal.current).toFixed(2)} to go</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
-
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      <span>ETA: {goal.eta}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[#35e0b4]">
-                      <TrendingUp className="w-4 h-4" />
-                      <span>+${goal.suggestedContribution.toFixed(2)}/mo</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => openContribute(goal)}>
-                      <DollarSign className="w-4 h-4 mr-2" />
-                      Contribute
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => openWithdraw(goal)}>
-                      Withdraw
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            )
-          })
-        })()}
+                <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  Contribute Now
+                </Button>
+              </div>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Empty state for when there are no goals */}
-      {goals.length === 0 && (
+      {sampleGoals.length === 0 && (
         <Card className="p-8 text-center bg-card border-border">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Target className="w-8 h-8 text-primary" />
           </div>
           <h3 className="font-semibold text-foreground mb-2">No goals yet</h3>
           <p className="text-sm text-muted-foreground mb-4">Create your first financial goal to get started</p>
-          <Button className="bg-primary hover:bg-primary/90" onClick={() => setIsAddOpen(true)}>
+          <Button className="bg-primary hover:bg-primary/90">
             <Plus className="w-4 h-4 mr-2" />
             Create Goal
           </Button>
         </Card>
       )}
-
-      {/* Contribute dialog */}
-      <Dialog open={!!contributeTarget} onOpenChange={(open) => { if (!open) setContributeTarget(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Contribute to {contributeTarget?.title}</DialogTitle>
-            <DialogDescription>Move money from excess reserves into this goal.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-2">
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1">Amount (max available ${excessReserves.toFixed(2)})</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={contributeTarget ? Math.min(excessReserves, Math.max(0, contributeTarget.target - contributeTarget.current)) : 0}
-                  step={0.01}
-                  value={contributeAmount}
-                  onChange={(e) => setContributeAmount(Number((e.target as HTMLInputElement).value))}
-                  className="flex-1"
-                />
-                <div className="w-28 text-right font-medium">${contributeAmount.toFixed(2)}</div>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Goal needs: ${contributeTarget ? (contributeTarget.target - contributeTarget.current).toFixed(2) : "0.00"}</p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setContributeTarget(null)}>Cancel</Button>
-            <Button onClick={handleContribute} className="bg-primary">Contribute</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Withdraw dialog */}
-      <Dialog open={!!withdrawTarget} onOpenChange={(open) => { if (!open) setWithdrawTarget(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Withdraw from {withdrawTarget?.title}</DialogTitle>
-            <DialogDescription>Return funds from this goal back to your excess reserves.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-2">
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1">Amount (max {withdrawTarget ? `$${withdrawTarget.current.toFixed(2)}` : "$0.00"})</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={withdrawTarget ? withdrawTarget.current : 0}
-                  step={0.01}
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(Number((e.target as HTMLInputElement).value))}
-                  className="flex-1"
-                />
-                <div className="w-28 text-right font-medium">${withdrawAmount.toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setWithdrawTarget(null)}>Cancel</Button>
-            <Button onClick={handleWithdraw} className="bg-primary">Withdraw</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
