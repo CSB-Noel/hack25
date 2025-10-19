@@ -233,59 +233,68 @@ export function GoalsView() {
 
       {/* Goals list */}
       <div className="space-y-3">
-        {goals.map((goal) => {
-          const progress = (goal.current / goal.target) * 100
+        {(() => {
+          const completed = goals.filter((g) => g.current >= g.target)
+          const incomplete = goals.filter((g) => g.current < g.target)
+          const sortedGoals = [...completed, ...incomplete]
 
-          return (
-            <Card key={goal.id} className="p-4 bg-card border-border hover:border-primary/50 transition-colors">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-foreground mb-1">{goal.title}</h3>
-                  <Badge variant="secondary" className={getCategoryColor(goal.category)}>
-                    {goal.category}
-                  </Badge>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Progress</p>
-                  <p className="text-lg font-bold text-primary">{progress.toFixed(0)}%</p>
-                </div>
-              </div>
+          return sortedGoals.map((goal) => {
+            const isComplete = goal.current >= goal.target
+            const progress = (goal.current / goal.target) * 100
 
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">
-                      ${goal.current.toFixed(2)} of ${goal.target.toFixed(2)}
-                    </span>
-                    <span className="text-muted-foreground">${(goal.target - goal.current).toFixed(2)} to go</span>
+            return (
+              <Card
+                key={goal.id}
+                className={`p-4 bg-card border-border hover:border-primary/50 transition-colors ${isComplete ? "ring-2 ring-green-200 border-green-400/60" : ""}`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground mb-1">{goal.title}</h3>
+                    <Badge variant="secondary" className={getCategoryColor(goal.category)}>
+                      {goal.category}
+                    </Badge>
                   </div>
-                  <Progress value={progress} className="h-2" />
-                </div>
-
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>ETA: {goal.eta}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[#35e0b4]">
-                    <TrendingUp className="w-4 h-4" />
-                    <span>+${goal.suggestedContribution.toFixed(2)}/mo</span>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Progress</p>
+                    <p className="text-lg font-bold text-primary">{progress.toFixed(0)}%</p>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => openContribute(goal)}>
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Contribute
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => openWithdraw(goal)}>
-                    Withdraw
-                  </Button>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">
+                        ${goal.current.toFixed(2)} of ${goal.target.toFixed(2)}
+                      </span>
+                      <span className="text-muted-foreground">${(goal.target - goal.current).toFixed(2)} to go</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      <span>ETA: {goal.eta}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[#35e0b4]">
+                      <TrendingUp className="w-4 h-4" />
+                      <span>+${goal.suggestedContribution.toFixed(2)}/mo</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => openContribute(goal)}>
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Contribute
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => openWithdraw(goal)}>
+                      Withdraw
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )
-        })}
+              </Card>
+            )
+          })
+        })()}
       </div>
 
       {/* Empty state for when there are no goals */}
