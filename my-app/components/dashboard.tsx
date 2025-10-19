@@ -26,43 +26,289 @@ type Insight = {
   };
 };
 
+// Celestial Loading Screen Component
+function CelestialLoadingScreen() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [dots, setDots] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots(prev => (prev + 1) % 4);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Create stars
+    const stars: Array<{ x: number; y: number; size: number; opacity: number; speed: number }> = [];
+    for (let i = 0; i < 150; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        opacity: Math.random(),
+        speed: Math.random() * 0.02 + 0.01
+      });
+    }
+
+    // Create constellation points (forming a circular pattern)
+    const constellationPoints: Array<{ x: number; y: number; radius: number; angle: number; speed: number }> = [];
+    const numPoints = 8;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const baseRadius = 80;
+
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2;
+      constellationPoints.push({
+        x: centerX,
+        y: centerY,
+        radius: baseRadius + Math.random() * 20,
+        angle: angle,
+        speed: 0.5 + Math.random() * 0.5
+      });
+    }
+
+    let animationFrame: number;
+    let time = 0;
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      time += 0.01;
+
+      // Draw and animate stars
+      stars.forEach(star => {
+        star.opacity += star.speed;
+        if (star.opacity > 1 || star.opacity < 0) {
+          star.speed = -star.speed;
+        }
+
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200, 220, 255, ${Math.abs(star.opacity)})`;
+        ctx.fill();
+      });
+
+      // Draw constellation pattern
+      ctx.strokeStyle = 'rgba(110, 168, 255, 0.4)';
+      ctx.lineWidth = 1.5;
+
+      // Update and draw constellation points
+      constellationPoints.forEach((point, i) => {
+        const currentAngle = point.angle + time * point.speed;
+        const x = point.x + Math.cos(currentAngle) * point.radius;
+        const y = point.y + Math.sin(currentAngle) * point.radius;
+
+        // Draw connections to next point (circular)
+        const nextPoint = constellationPoints[(i + 1) % constellationPoints.length];
+        const nextAngle = nextPoint.angle + time * nextPoint.speed;
+        const nextX = nextPoint.x + Math.cos(nextAngle) * nextPoint.radius;
+        const nextY = nextPoint.y + Math.sin(nextAngle) * nextPoint.radius;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(nextX, nextY);
+        ctx.stroke();
+
+        // Draw point with glow
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 8);
+        gradient.addColorStop(0, 'rgba(110, 168, 255, 0.8)');
+        gradient.addColorStop(1, 'rgba(110, 168, 255, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#6ea8ff';
+        ctx.fill();
+      });
+
+      // Draw center connecting lines (every other point)
+      ctx.strokeStyle = 'rgba(110, 168, 255, 0.2)';
+      ctx.lineWidth = 1;
+      constellationPoints.forEach((point, i) => {
+        if (i % 2 === 0) {
+          const currentAngle = point.angle + time * point.speed;
+          const x = point.x + Math.cos(currentAngle) * point.radius;
+          const y = point.y + Math.sin(currentAngle) * point.radius;
+
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+      });
+
+      // Draw center glow
+      const centerGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 15);
+      centerGradient.addColorStop(0, 'rgba(110, 168, 255, 0.6)');
+      centerGradient.addColorStop(1, 'rgba(110, 168, 255, 0)');
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
+      ctx.fillStyle = centerGradient;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#6ea8ff';
+      ctx.fill();
+
+      animationFrame = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-background">
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0"
+        style={{ background: 'transparent' }}
+      />
+      <div className="relative z-10 text-center">
+        <div className="mb-6">
+          <div className="text-2xl font-semibold text-foreground mb-2">
+            Mapping Your Financial Constellation
+          </div>
+          <div className="text-muted-foreground">
+            Analyzing your universe of transactions{'.'.repeat(dots + 1)}
+          </div>
+        </div>
+        
+        {/* Orbital rings animation */}
+        <div className="relative w-24 h-24 mx-auto">
+          <div className="absolute inset-0 border-2 border-primary/30 rounded-full animate-spin" style={{ animationDuration: '3s' }} />
+          <div className="absolute inset-2 border-2 border-primary/20 rounded-full animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+          <div className="absolute inset-4 border-2 border-primary/10 rounded-full animate-spin" style={{ animationDuration: '4s' }} />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-3 h-3 bg-primary rounded-full animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// No Insights Found Component
+function NoInsightsFound({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-background p-4">
+      <div className="text-center max-w-md">
+        {/* Simple star icon */}
+        <div className="mb-6 flex justify-center">
+          <div className="relative">
+            <svg
+              className="w-16 h-16 text-muted-foreground/40"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+              />
+            </svg>
+            {/* Small sparkle dots */}
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary/40 rounded-full animate-pulse" />
+            <div className="absolute -bottom-1 -left-1 w-1.5 h-1.5 bg-primary/30 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }} />
+          </div>
+        </div>
+
+        <h2 className="text-xl font-semibold text-foreground mb-2">
+          No Financial Insights Found
+        </h2>
+        <p className="text-muted-foreground mb-8">
+          We couldn't find any financial transactions in your emails. Make sure your email account is connected and has transaction emails.
+        </p>
+
+        <button
+          onClick={onRetry}
+          className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors duration-200 font-medium"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          Try Again
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: session } = useSession();
   const [insights, setInsights] = useState<Insight[] | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchAIResults = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ai-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'gmail', maxResults: 20 }),
+      });
+
+      const data = await res.json();
+      if (data.success && Array.isArray(data.result)) {
+        setInsights(data.result);
+      } else {
+        console.error(data.error);
+        setInsights([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setInsights([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!session) return;
-
-    async function getAIResults() {
-      setLoading(true);
-      try {
-        const res = await fetch('/api/ai-process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: 'gmail', maxResults: 20 }),
-        });
-
-        const data = await res.json();
-        if (data.success && Array.isArray(data.result)) {
-          setInsights(data.result);
-        } else {
-          console.error(data.error);
-          setInsights([]);
-        }
-      } catch (err) {
-        console.error(err);
-        setInsights([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    getAIResults();
+    fetchAIResults();
   }, [session]);
 
-  if (loading) return <div>Loading your insights...</div>;
-  if (!insights || insights.length === 0) return <div>No financial insights found.</div>;
+  if (loading) return <CelestialLoadingScreen />;
+  if (!insights || insights.length === 0) return <NoInsightsFound onRetry={fetchAIResults} />;
 
   return <FeedView initialInsights={insights} />;
 }
