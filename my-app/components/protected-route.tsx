@@ -39,7 +39,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         />
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Welcome to StellarFinance</h1>
+            <h1 className="text-2xl font-bold mb-4">Welcome to Orion</h1>
             <p className="text-muted-foreground">Please complete onboarding to continue</p>
           </div>
         </div>

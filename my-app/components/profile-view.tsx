@@ -115,19 +115,19 @@ export function ProfileView() {
                 <p className="text-xs text-muted-foreground">Capital One Savor</p>
               </div>
             </button>
-            <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
+            {/* <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
               <Shield className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium text-foreground">Privacy & Security</p>
                 <p className="text-xs text-muted-foreground">Manage your data</p>
               </div>
-            </button>
+            </button> */}
           </Card>
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3">Support</h3>
-          <Card className="bg-card border-border divide-y divide-border">
+          {/* <h3 className="text-sm font-semibold text-muted-foreground mb-3">Support</h3> */}
+          {/* <Card className="bg-card border-border divide-y divide-border"> */}
             {/* <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
               <HelpCircle className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1 text-left">
@@ -135,18 +135,18 @@ export function ProfileView() {
                 <p className="text-xs text-muted-foreground">FAQs and guides</p>
               </div>
             </button> */}
-            <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors text-destructive">
+            {/* <button className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors text-destructive">
               <LogOut className="w-5 h-5" />
               <div className="flex-1 text-left">
                 <p className="text-sm font-medium">Sign Out</p>
                 <p className="text-xs text-muted-foreground">Log out of your account</p>
               </div>
-            </button>
-          </Card>
+            </button> */}
+          {/* </Card> */}
         </div>
       </div> 
       <div className="mt-6 text-center">
-        <p className="text-xs text-muted-foreground">StellarFinance v1.0.0</p>
+        <p className="text-xs text-muted-foreground">Orion v1.0.0</p>
       </div>
     </>
   )

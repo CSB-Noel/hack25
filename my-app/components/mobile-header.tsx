@@ -21,7 +21,7 @@ export function MobileHeader() {
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
         <div className="flex-1 flex items-center justify-center gap-2">
-          <h1 className="text-lg title-font font-semibold">StellarFinance</h1>
+          <h1 className="text-lg title-font font-semibold">Orion</h1>
           <StarCrescentSolid size="24" />
         </div>
 
