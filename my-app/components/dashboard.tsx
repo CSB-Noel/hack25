@@ -17,6 +17,7 @@ type Insight = {
   category: string;
   delta30: number;
   delta90: number;
+  email: string;
   aiHeader: {
     bullets: string[];
     nextStep: string;
