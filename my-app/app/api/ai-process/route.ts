@@ -47,18 +47,23 @@ export async function POST(request: NextRequest) {
 
 
     const prompt = `
-You are a financial insights engine that analyzes email data to detect financial activity, subscriptions, bills, or anomalies.
-
 Given the INPUT below, return a JSON array summarizing all relevant financial items (bills, subscriptions, transactions, anomalies, or goals).
 
 ### INPUT
 ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
 
 ### INSTRUCTIONS
-1. Parse the email messages for purchase receipts, subscriptions, bills, or any financial patterns.
+1. Parse the email messages for with TASKS
 2. Each JSON object in the output represents one detected financial insight or event.
-3. Use the following schema for each output object:
+3. Only include items related to financial activity (e.g., purchases, bills, subscriptions, payment alerts, or fraud).
+4. Ignore irrelevant newsletters, promotions, or personal messages unless they include financial intent or transactions.
+5. If no financial items are found, return an empty array \`[]\`.
+6. Return valid JSON only. Do not include explanations or markdown.
 
+
+**IMPORTANT: Ensure the output is in json format
+
+    Use the following STRICT format for the output:
 {
   id: string, // unique incremental ID
   kind: "subscription" | "bill" | "anomaly" | "goal" | "advice",
@@ -77,11 +82,6 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
     confidence: number // 0.0–1.0
   }
 }
-
-4. Only include items related to financial activity (e.g., purchases, bills, subscriptions, payment alerts, or fraud).
-5. Ignore irrelevant newsletters, promotions, or personal messages unless they include financial intent or transactions.
-6. If no financial items are found, return an empty array \`[]\`.
-7. Return valid JSON only. Do not include explanations or markdown.
 
 ### OUTPUT EXAMPLE
 [
@@ -123,9 +123,11 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
           {
             role: "system",
             content: `
-            You are a financial insights assistant. Your job is to read and analyze email messages to detect financial activity, including bills, subscriptions, purchases, anomalies, and payment-related alerts. 
+            ROLE: You are a financial insights assistant.
 
-            Tasks:
+Based on a provided email json input, extract actionable financial insights through scanning through one or more emails to detect financial activity such as bills, subscriptions, purchases, anomalies, and payment-related alerts. Do this by following the TASKS.
+
+TASKS:
             1. Classify each email as a relevant financial type: subscription, bill, anomaly, goal, or advice.
             2. Extract key details: merchant name, amount, date, account, category.
             3. Summarize financial insights in short, actionable points.
@@ -133,8 +135,8 @@ ${JSON.stringify({ count: emailJson.length, messages: emailJson }, null, 2)}
             5. Assign confidence scores (0.0-1.0) and relevant badges (e.g., priority, dueSoon, anomaly, priceUp, duplicateSub).
             6. Only return JSON in the specified output format. Do not include explanations, markdown, or text outside JSON.
 
-            Always focus on actionable financial insights, ignoring unrelated newsletters or personal messages unless they contain financial data.
-            `,
+            Always focus on actionable financial insights, ignoring unrelated newsletters or personal messages unless they contain financial data. Prioritize reading dates, amounts, merchants, subscriptions, bills, and anomalies from the email text.  Do not invent content that is not present. Be precise and concise.
+            Ensure the output is valid JSON and adheres strictly to the provided format.`,
           },
           {
             role: "user",
