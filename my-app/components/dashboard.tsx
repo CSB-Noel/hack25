@@ -332,8 +332,11 @@ export default function Dashboard() {
         console.error("Nessie API fetch failed:", nessieResult.reason);
       }
 
-      // Combine both results (even if one failed)
-      const combinedInsights = [...emailInsights, ...nessieInsights];
+      // Combine both results (even if one failed) and ensure amount defaults to 0 if null
+      const combinedInsights = [...emailInsights, ...nessieInsights].map(insight => ({
+        ...insight,
+        amount: insight.amount ?? 0
+      }));
       setLocalInsights(combinedInsights);
       setInsights(combinedInsights); // Cache in store
       
