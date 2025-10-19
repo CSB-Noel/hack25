@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "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")
 
 # Load sample transactions from data.json (used instead of request.transactions)
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'data.json')

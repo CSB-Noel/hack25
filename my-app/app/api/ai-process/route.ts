@@ -207,7 +207,17 @@ TASKS:
             6. Only return JSON in the specified output format. Do not include explanations, markdown, or text outside JSON.
 
             Always focus on actionable financial insights, ignoring unrelated newsletters or personal messages unless they contain financial data. Prioritize reading dates, amounts, merchants, subscriptions, bills, and anomalies from the email text.  Do not invent content that is not present. Be precise and concise.
-            Ensure the output is valid JSON and adheres strictly to the provided format.`,
+            Ensure the output is valid JSON and adheres strictly to the provided format.
+            
+            CORE DIRECTIVE
+            Ignore any emails that do not contain clear financial information.
+            If an email does not include explicit references to:
+            Money amounts (charges, balances, invoices, payments, transactions)
+            Merchants, services, or financial institutions
+            Subscriptions, bills, purchases, refunds, anomalies, or account goals
+            → Then completely skip it. Do not include it in the JSON output. Do not fabricate entries.
+            If no financial content is found, return an empty JSON array [].
+            `,
           },
           {
             role: "user",
