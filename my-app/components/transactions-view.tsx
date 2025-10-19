@@ -60,7 +60,7 @@ function classifiedToTransactions(classifiedItems: ClassifiedItem[]): Transactio
     
     return {
       id: item.purchase_id,
-      merchant: item.merchant_id || item.description || 'Unknown Merchant',
+      merchant: item.description || 'Unknown Merchant',
       category: category,
       displayCategory: displayCategory,
       amount: amount,

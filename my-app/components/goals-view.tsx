@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Target, TrendingUp, Plus, DollarSign, Calendar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
 interface Goal {
@@ -18,45 +26,6 @@ interface Goal {
   suggestedContribution: number
   category: "savings" | "debt" | "investment"
 }
-
-const sampleGoals: Goal[] = [
-  {
-    id: "1",
-    title: "Emergency Fund",
-    target: 5000,
-    current: 3250,
-    eta: "4 months",
-    suggestedContribution: 150,
-    category: "savings",
-  },
-  {
-    id: "2",
-    title: "Vacation to Japan",
-    target: 3500,
-    current: 1200,
-    eta: "8 months",
-    suggestedContribution: 287.5,
-    category: "savings",
-  },
-  {
-    id: "3",
-    title: "Credit Card Payoff",
-    target: 2400,
-    current: 1600,
-    eta: "3 months",
-    suggestedContribution: 266.67,
-    category: "debt",
-  },
-  {
-    id: "4",
-    title: "Down Payment Fund",
-    target: 20000,
-    current: 8500,
-    eta: "18 months",
-    suggestedContribution: 638.89,
-    category: "savings",
-  },
-]
 
 export function GoalsView() {
   const getCategoryColor = (category: string) => {
@@ -72,9 +41,19 @@ export function GoalsView() {
     }
   }
 
-  // state: manage goals and single-account excess reserves
   const [excessReserves, setExcessReserves] = React.useState<number>(2500)
-  const [goals, setGoals] = React.useState<Goal[]>(sampleGoals)
+  const [goals, setGoals] = React.useState<Goal[]>([])
+
+  // 🔹 Load goals from localStorage on mount
+  React.useEffect(() => {
+    const stored = localStorage.getItem("goals")
+    if (stored) setGoals(JSON.parse(stored))
+  }, [])
+
+  // 🔹 Save goals to localStorage whenever they change
+  React.useEffect(() => {
+    localStorage.setItem("goals", JSON.stringify(goals))
+  }, [goals])
 
   // Add goal dialog state
   const [isAddOpen, setIsAddOpen] = React.useState(false)
@@ -82,30 +61,19 @@ export function GoalsView() {
   const [addTarget, setAddTarget] = React.useState<number | undefined>(undefined)
   const [addPercent, setAddPercent] = React.useState<number>(0)
 
-  // compute maximum percent that can be allocated without overflowing the goal
   const maxAddPercent = React.useMemo(() => {
     if (!addTarget || excessReserves <= 0) return 100
-    // percent = (addTarget / excessReserves) * 100
     const pct = Math.floor((addTarget / excessReserves) * 100)
     return Math.min(100, Math.max(0, pct))
   }, [addTarget, excessReserves])
 
-  // clamp addPercent when max changes
   React.useEffect(() => {
     if (addPercent > maxAddPercent) setAddPercent(maxAddPercent)
   }, [maxAddPercent])
 
-  // Contribute dialog state
-  const [contributeTarget, setContributeTarget] = React.useState<Goal | null>(null)
-  const [contributeAmount, setContributeAmount] = React.useState<number>(0)
-
-  // Handlers
   const handleCreateGoal = () => {
     if (!addName || !addTarget) return
-    // Amount taken from excess reserves = percentage of current excess reserves
-    // desired amount based on selected percent of excess reserves (rounded to cents)
     const desired = Math.round((addPercent / 100) * excessReserves * 100) / 100
-    // don't allocate more than we have, and never more than the goal's target (can't overfill on creation)
     const amount = Math.round(Math.min(excessReserves, desired, addTarget) * 100) / 100
 
     const newGoal: Goal = {
@@ -118,7 +86,7 @@ export function GoalsView() {
       category: "savings",
     }
 
-    setGoals((g) => [newGoal, ...g])
+    setGoals((prev) => [newGoal, ...prev])
     setExcessReserves((r) => Math.round((r - amount) * 100) / 100)
     setAddName("")
     setAddTarget(undefined)
@@ -126,31 +94,15 @@ export function GoalsView() {
     setIsAddOpen(false)
   }
 
-  const openContribute = (goal: Goal) => {
-    const maxContribute = Math.min(excessReserves, Math.max(0, goal.target - goal.current))
-    setContributeTarget(goal)
-    // default to 25% of maxContribute for convenience (rounded to cents)
-    setContributeAmount(Math.round((maxContribute * 0.25) * 100) / 100)
-  }
-
-  // Withdraw state
+  const [contributeTarget, setContributeTarget] = React.useState<Goal | null>(null)
+  const [contributeAmount, setContributeAmount] = React.useState<number>(0)
   const [withdrawTarget, setWithdrawTarget] = React.useState<Goal | null>(null)
   const [withdrawAmount, setWithdrawAmount] = React.useState<number>(0)
 
-  const openWithdraw = (goal: Goal) => {
-    setWithdrawTarget(goal)
-    // default to 25% of goal.current
-    setWithdrawAmount(Math.round((goal.current * 0.25) * 100) / 100)
-  }
-
-  const handleWithdraw = () => {
-    if (!withdrawTarget) return
-    const amount = Math.min(withdrawAmount, withdrawTarget.current)
-    if (amount <= 0) return
-
-    setGoals((prev) => prev.map((g) => (g.id === withdrawTarget.id ? { ...g, current: Math.round((g.current - amount) * 100) / 100 } : g)))
-    setExcessReserves((r) => Math.round((r + amount) * 100) / 100)
-    setWithdrawTarget(null)
+  const openContribute = (goal: Goal) => {
+    const maxContribute = Math.min(excessReserves, Math.max(0, goal.target - goal.current))
+    setContributeTarget(goal)
+    setContributeAmount(Math.round(maxContribute * 0.25 * 100) / 100)
   }
 
   const handleContribute = () => {
@@ -159,10 +111,40 @@ export function GoalsView() {
     const amount = Math.min(contributeAmount, excessReserves, Math.max(0, maxNeeded))
     if (amount <= 0) return
 
-    setGoals((prev) => prev.map((g) => (g.id === contributeTarget.id ? { ...g, current: Math.round((g.current + amount) * 100) / 100 } : g)))
+    setGoals((prev) =>
+      prev.map((g) =>
+        g.id === contributeTarget.id
+          ? { ...g, current: Math.round((g.current + amount) * 100) / 100 }
+          : g
+      )
+    )
     setExcessReserves((r) => Math.round((r - amount) * 100) / 100)
     setContributeTarget(null)
   }
+
+  const openWithdraw = (goal: Goal) => {
+    setWithdrawTarget(goal)
+    setWithdrawAmount(Math.round(goal.current * 0.25 * 100) / 100)
+  }
+
+  const handleWithdraw = () => {
+    if (!withdrawTarget) return
+    const amount = Math.min(withdrawAmount, withdrawTarget.current)
+    if (amount <= 0) return
+
+    setGoals((prev) =>
+      prev.map((g) =>
+        g.id === withdrawTarget.id
+          ? { ...g, current: Math.round((g.current - amount) * 100) / 100 }
+          : g
+      )
+    )
+    setExcessReserves((r) => Math.round((r + amount) * 100) / 100)
+    setWithdrawTarget(null)
+  }
+
+  // ✅ rest of your JSX stays exactly the same
+  // (no Supabase calls, everything just uses state)
 
   return (
     <div className="px-4 max-w-md mx-auto pb-4">
