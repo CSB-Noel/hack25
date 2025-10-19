@@ -284,38 +284,61 @@ export default function Dashboard() {
   const fetchAIResults = async () => {
     setLoading(true);
     setIsDataLoading(true);
+    
     try {
-      const res = await fetch('/api/ai-process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'gmail', maxResults: 20 }),
-      });
+      // Fetch both APIs in parallel
+      const [emailResult, nessieResult] = await Promise.allSettled([
+        // Email/Gmail API fetch
+        fetch('/api/ai-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'gmail', maxResults: 20 }),
+        }).then(res => res.json()),
+        
+        // Nessie API fetch
+        fetch('http://localhost:8000/fetch_insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: [] }),
+        }).then(res => res.json())
+      ]);
 
-      const data = await res.json();
-      if (data.success && Array.isArray(data.result)) {
-        setLocalInsights(data.result);
-        setInsights(data.result); // Cache in store
+      // Process email results
+      let emailInsights: Insight[] = [];
+      if (emailResult.status === 'fulfilled') {
+        const data = emailResult.value;
+        console.log("Email Log: ", data);
+        if (data.success && Array.isArray(data.result)) {
+          emailInsights = data.result;
+        } else {
+          console.error("Email API error:", data.error);
+        }
       } else {
-        console.error(data.error);
-        setLocalInsights([]);
-        setInsights([]);
+        console.error("Email API fetch failed:", emailResult.reason);
       }
-      //http://api.nessieisreal.com/accounts/68f48dae9683f20dd51a1ebb/purchases?key=d461396736751a628792c8541024f40b
-      const res2 = await fetch('http://localhost:8000/fetch_insights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactions: [] }),
-      });
-      const data2 = await res2.json();
-      console.log("Email Log: ", data);
-      console.log("Nessie Purchases:", data2);
-      const cleaned = data2.result.replace(/```json\s*/i, "").replace(/```/g, "").trim();
-      const combinedInsights = [...data.result, ...JSON.parse(cleaned)];
+
+      // Process Nessie results
+      let nessieInsights: Insight[] = [];
+      if (nessieResult.status === 'fulfilled') {
+        const data = nessieResult.value;
+        console.log("Nessie Purchases:", data);
+        try {
+          const cleaned = data.result.replace(/```json\s*/i, "").replace(/```/g, "").trim();
+          nessieInsights = JSON.parse(cleaned);
+        } catch (parseErr) {
+          console.error("Failed to parse Nessie insights:", parseErr);
+        }
+      } else {
+        console.error("Nessie API fetch failed:", nessieResult.reason);
+      }
+
+      // Combine both results (even if one failed)
+      const combinedInsights = [...emailInsights, ...nessieInsights];
       setLocalInsights(combinedInsights);
       setInsights(combinedInsights); // Cache in store
       
     } catch (err) {
-      console.error(err);
+      console.error("Unexpected error during fetch:", err);
       setLocalInsights([]);
       setInsights([]);
     } finally {
